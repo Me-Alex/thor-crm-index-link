@@ -10,6 +10,7 @@
     "wrangler:types": "wrangler types src/worker-configuration.d.ts"
   },
   "dependencies": {
+    "@thor-crm/adapters": "*",
     "@supabase/supabase-js": "^2.106.1",
     "zod": "^4.4.3"
   },

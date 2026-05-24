@@ -1,5 +1,6 @@
 import { handleRequest } from "./http/router";
 import type { Env, DiscoverMessage, FetchMessage, MatchMessage } from "./runtime/env";
+import { handleQueueBatch } from "./queue/handler";
 
 export default {
   fetch(request: Request, env: Env): Promise<Response> {
@@ -10,8 +11,8 @@ export default {
     ctx.waitUntil(scheduleDiscover(event, env));
   },
 
-  queue(batch: MessageBatch<DiscoverMessage | FetchMessage | MatchMessage>, _env: Env, ctx: ExecutionContext): void {
-    ctx.waitUntil(handleQueueBatch(batch));
+  queue(batch: MessageBatch<DiscoverMessage | FetchMessage | MatchMessage>, env: Env, ctx: ExecutionContext): void {
+    ctx.waitUntil(handleQueueBatch(batch, env));
   }
 };
 
@@ -22,15 +23,9 @@ async function scheduleDiscover(event: ScheduledEvent, env: Env): Promise<void> 
   }
 
   await env.DISCOVER_QUEUE.send({
+    kind: "discover",
     sourceId: "demo",
     seedUrl: "https://example.test/listings",
     requestedAt: new Date(event.scheduledTime).toISOString()
   });
-}
-
-async function handleQueueBatch(batch: MessageBatch<DiscoverMessage | FetchMessage | MatchMessage>): Promise<void> {
-  for (const message of batch.messages) {
-    console.log("queue_message_received", { id: message.id, body: message.body });
-    message.ack();
-  }
 }

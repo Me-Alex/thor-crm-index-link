@@ -47,6 +47,24 @@ Reguli:
 - `429` și `503` reduc frecvența sau pun sursa în `degraded`, nu declanșează retry agresiv.
 - Worker-ul trebuie să expună cel puțin `/health`; `/ready` poate fi adăugat când există dependențe critice runtime.
 
+### Demo ingest
+
+Endpointul operațional pentru fixture ingest este:
+
+```bash
+curl -X POST \
+  -H "x-admin-api-key: <ADMIN_API_KEY>" \
+  https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/admin/ingest/demo
+```
+
+Acest endpoint:
+
+- rulează doar fixture-ul demo permis;
+- nu face request către portaluri reale;
+- normalizează listingul;
+- face upsert în `source_listings` prin Supabase REST, server-side;
+- necesită `ADMIN_API_KEY`.
+
 ## Cloudflare Pages
 
 Frontend-ul este publicat la:

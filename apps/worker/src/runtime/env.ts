@@ -9,18 +9,22 @@ export interface Env {
 }
 
 export interface DiscoverMessage {
+  kind: "discover";
   sourceId: string;
   seedUrl: string;
   requestedAt: string;
 }
 
 export interface FetchMessage {
+  kind: "fetch";
   sourceId: string;
   url: string;
   discoveredAt: string;
+  fixtureHtml?: string;
 }
 
 export interface MatchMessage {
+  kind: "match";
   sourceListingId: string;
   observedAt: string;
 }

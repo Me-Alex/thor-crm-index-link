@@ -60,7 +60,14 @@ Această separare previne:
 ## Direcții următoare
 
 - Extrage tipurile comune în `packages/core`.
-- Mută adapterele în `packages/adapters`.
+- Extinde `packages/adapters` din adapterul demo pe fixture către adaptere reale aprobate.
 - Mută dedup scoring în `packages/dedup`.
 - Adaugă fixture builders în `packages/testing`.
 - Adaugă teste RLS explicite pentru izolarea tenant.
+
+## Stare implementare
+
+- `packages/adapters` conține un adapter demo care parsează fixture HTML permis.
+- Worker-ul are un fetch pipeline MVP care normalizează observația și face upsert în `source_listings` prin Supabase REST cu service role server-side.
+- Queue handler-ul procesează mesajele `fetch` pe fixture și nu face requesturi live către portaluri reale.
+- `POST /admin/ingest/demo` rulează ingestia demo prin același pipeline și este protejat cu `x-admin-api-key`.

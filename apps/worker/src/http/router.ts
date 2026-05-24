@@ -1,7 +1,14 @@
-import { jsonResponse, methodNotAllowed, notFound } from "./responses";
+import { demoListingFixtureHtml } from "@thor-crm/adapters";
+import { handleFetchMessage } from "../queue/fetchPipeline";
+import { jsonResponse, methodNotAllowed, notFound, unauthorized } from "./responses";
 import type { Env } from "../runtime/env";
+import type { FetchPipelineOptions } from "../queue/fetchPipeline";
 
-export async function handleRequest(request: Request, env: Env): Promise<Response> {
+export interface RouterOptions extends FetchPipelineOptions {}
+
+const demoFixtureUrl = "https://example.test/listings/demo-apt-titan";
+
+export async function handleRequest(request: Request, env: Env, options: RouterOptions = {}): Promise<Response> {
   const url = new URL(request.url);
 
   if (url.pathname === "/health") {
@@ -16,5 +23,53 @@ export async function handleRequest(request: Request, env: Env): Promise<Respons
     });
   }
 
+  if (url.pathname === "/admin/ingest/demo") {
+    if (request.method !== "POST") {
+      return methodNotAllowed();
+    }
+
+    if (!isAuthorizedAdmin(request, env.ADMIN_API_KEY)) {
+      return unauthorized();
+    }
+
+    await handleFetchMessage(
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: demoFixtureUrl,
+        discoveredAt: new Date().toISOString(),
+        fixtureHtml: demoListingFixtureHtml
+      },
+      env,
+      options
+    );
+
+    return jsonResponse({
+      ok: true,
+      sourceId: "demo",
+      url: demoFixtureUrl,
+      status: "ingested"
+    });
+  }
+
   return notFound();
+}
+
+function isAuthorizedAdmin(request: Request, expectedKey: string): boolean {
+  const providedKey = request.headers.get("x-admin-api-key") ?? "";
+  return constantTimeEqual(providedKey, expectedKey);
+}
+
+function constantTimeEqual(left: string, right: string): boolean {
+  const encoder = new TextEncoder();
+  const leftBytes = encoder.encode(left);
+  const rightBytes = encoder.encode(right);
+  const length = Math.max(leftBytes.length, rightBytes.length);
+  let diff = leftBytes.length ^ rightBytes.length;
+
+  for (let index = 0; index < length; index += 1) {
+    diff |= (leftBytes[index] ?? 0) ^ (rightBytes[index] ?? 0);
+  }
+
+  return diff === 0;
 }

@@ -27,3 +27,13 @@ export function methodNotAllowed(): Response {
     { status: 405 }
   );
 }
+
+export function unauthorized(): Response {
+  return jsonResponse(
+    {
+      error: "unauthorized",
+      message: "Invalid admin API key"
+    },
+    { status: 401 }
+  );
+}
