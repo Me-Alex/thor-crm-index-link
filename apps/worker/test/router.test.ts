@@ -43,6 +43,19 @@ describe("handleRequest", () => {
     });
   });
 
+  it("fails closed when admin API key is not configured", async () => {
+    const response = await handleRequest(
+      new Request("https://worker.test/admin/ingest/demo", { method: "POST" }),
+      { ...env(), ADMIN_API_KEY: undefined } as never
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.json()).toEqual({
+      error: "unauthorized",
+      message: "Invalid admin API key"
+    });
+  });
+
   it("runs demo ingest through the fixture pipeline when authorized", async () => {
     const writes: unknown[] = [];
     const response = await handleRequest(

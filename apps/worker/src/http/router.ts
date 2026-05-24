@@ -57,6 +57,9 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
 
 function isAuthorizedAdmin(request: Request, expectedKey: string): boolean {
   const providedKey = request.headers.get("x-admin-api-key") ?? "";
+  if (!expectedKey || !providedKey) {
+    return false;
+  }
   return constantTimeEqual(providedKey, expectedKey);
 }
 
