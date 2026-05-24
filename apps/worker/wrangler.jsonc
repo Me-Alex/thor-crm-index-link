@@ -1,0 +1,55 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "thor-crm-index-link-worker",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-24",
+  "compatibility_flags": [
+    "nodejs_compat_v2"
+  ],
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 1
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+    "SUPABASE_URL": "https://mrnltzamrhgrgslmjzvu.supabase.co"
+  },
+  "triggers": {
+    "crons": [
+      "*/5 * * * *"
+    ]
+  },
+  "queues": {
+    "producers": [
+      {
+        "binding": "DISCOVER_QUEUE",
+        "queue": "thor-crm-discover"
+      },
+      {
+        "binding": "FETCH_QUEUE",
+        "queue": "thor-crm-fetch"
+      },
+      {
+        "binding": "MATCH_QUEUE",
+        "queue": "thor-crm-match"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "thor-crm-discover",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30
+      },
+      {
+        "queue": "thor-crm-fetch",
+        "max_batch_size": 10,
+        "max_batch_timeout": 30
+      },
+      {
+        "queue": "thor-crm-match",
+        "max_batch_size": 25,
+        "max_batch_timeout": 30
+      }
+    ]
+  }
+}

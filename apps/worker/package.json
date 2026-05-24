@@ -1,0 +1,22 @@
+{
+  "name": "@thor-crm/worker",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit",
+    "wrangler:types": "wrangler types src/worker-configuration.d.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.1",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260524.1",
+    "@types/node": "^25.9.1",
+    "vitest": "^4.1.7",
+    "wrangler": "^4.94.0"
+  }
+}
