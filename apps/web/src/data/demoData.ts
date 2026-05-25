@@ -56,6 +56,8 @@ export interface SourceHealth {
   id: string;
   name: string;
   mode: SourceMode;
+  listingCount?: number;
+  latestSeenAt?: string;
   crawlSuccessRate: number;
   parseSuccessRate: number;
   matchRate: number;
