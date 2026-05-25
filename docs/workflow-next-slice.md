@@ -4,11 +4,12 @@ Date: 2026-05-25
 
 ## Scope implemented
 
-This slice adds isolated, pure workflow functions for saved search matching and in-app alert delivery planning. It does not add auth UI, real email/webhook delivery, crawler behavior, or database writes.
+This slice adds saved search matching, in-app alert planning, and Worker-side persistence into `alert_deliveries`. It does not add auth UI, real email/webhook delivery, or external crawler behavior.
 
 Ownership stayed inside:
 
 - `apps/worker/src/workflow/*`
+- `apps/worker/src/queue/fetchPipeline.ts`
 - `apps/worker/test/workflowAlerts.test.ts`
 - `docs/workflow-next-slice.md`
 
@@ -45,28 +46,35 @@ Behavior:
 - Ignores searches with `alertsEnabled: false`.
 - Emits only in-app delivery candidates.
 - Deduplicates by `tenantId:savedSearchId:canonicalListingId`.
-- Returns delivery candidates only; it does not persist or send notifications.
+- Returns delivery candidates only; persistence is handled by the Worker-side repository.
+
+### `planAndPersistAlertDeliveriesForListing(env, canonicalListingId, evaluatedAt, options)`
+
+Behavior:
+
+- Loads the canonical listing projection from Supabase REST.
+- Loads enabled `in_app` alerts and their saved searches.
+- Skips existing deliveries for the same tenant/search/listing.
+- Inserts pending `alert_deliveries` with matched reasons in payload.
 
 ## Next integration step
 
-[@github](plugin://github@openai-curated) Task: connect the pure workflow functions to a Worker-side repository layer.
+[@github](plugin://github@openai-curated) Task: expose tenant workflow and alert history through authenticated API/UI.
 
 Constraints:
 
 - Follow `AGENTS.md`.
 - Do not edit `apps/web`.
 - Do not send email or webhooks.
-- Add Supabase repository code only behind Worker/server boundaries.
+- Keep Supabase repository code behind Worker/server boundaries.
 - Keep service role usage out of frontend code.
 
 Suggested behavior:
 
-1. Read changed canonical listing IDs from the matcher/indexing path.
-2. Load tenant saved searches from Supabase.
-3. Load existing alert deliveries for the same tenant/search/listing keys.
-4. Call `planAlertDeliveries`.
-5. Insert returned candidates into `alert_deliveries` as pending/in-app records.
-6. Add tests with fake repositories; no real Supabase calls in tests.
+1. Add authenticated tenant API endpoints for listing state, tags, notes, saved searches, and alert history.
+2. Wire the frontend to those endpoints behind Supabase Auth.
+3. Keep public demo fallback for unauthenticated users.
+4. Add tests with fake repositories; no real Supabase calls in tests.
 
 ## Verification target
 

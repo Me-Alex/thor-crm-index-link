@@ -1,11 +1,18 @@
 import { getAdapter } from "@thor-crm/adapters";
 import { normalizeListingObservation } from "../ingest/normalization";
+import type { NormalizedListingObservation } from "../ingest/types";
 import type { Env, FetchMessage } from "../runtime/env";
+import { planAndPersistAlertDeliveriesForWorkflowListing, type AlertDeliveryRepositoryOptions } from "../workflow/alertDeliveryRepository";
+import type { WorkflowListing } from "../workflow/types";
 import { persistCanonicalMatch, type CanonicalListingRepositoryOptions } from "./canonicalListingRepository";
 import { fetchHtml, type HtmlFetchOptions } from "./httpFetch";
 import { upsertSourceListing, type SourceListingRepositoryOptions } from "./sourceListingRepository";
 
-export interface FetchPipelineOptions extends SourceListingRepositoryOptions, CanonicalListingRepositoryOptions, HtmlFetchOptions {}
+export interface FetchPipelineOptions
+  extends SourceListingRepositoryOptions,
+    CanonicalListingRepositoryOptions,
+    AlertDeliveryRepositoryOptions,
+    HtmlFetchOptions {}
 
 export async function handleFetchMessage(message: FetchMessage, env: Env, options: FetchPipelineOptions = {}): Promise<void> {
   const html = message.fixtureHtml ?? (await fetchHtml(message.url, options));
@@ -36,5 +43,25 @@ export async function handleFetchMessage(message: FetchMessage, env: Env, option
     },
     options
   );
-  await persistCanonicalMatch(env, sourceListingId, normalized, options);
+  const canonicalMatch = await persistCanonicalMatch(env, sourceListingId, normalized, options);
+  await planAndPersistAlertDeliveriesForWorkflowListing(env, toWorkflowListing(canonicalMatch.canonicalListingId, normalized), normalized.observedAt, options);
+}
+
+function toWorkflowListing(canonicalListingId: string, observation: NormalizedListingObservation): WorkflowListing {
+  const listing: WorkflowListing = {
+    canonicalListingId,
+    title: observation.title,
+    propertyType: observation.propertyType,
+    transactionType: observation.transactionType,
+    searchText: observation.searchText
+  };
+
+  if (observation.priceEur !== undefined) listing.priceEur = observation.priceEur;
+  if (observation.areaSqm !== undefined) listing.areaSqm = observation.areaSqm;
+  if (observation.rooms !== undefined) listing.rooms = observation.rooms;
+  if (observation.city) listing.city = observation.city;
+  if (observation.district) listing.district = observation.district;
+  if (observation.neighborhood) listing.neighborhood = observation.neighborhood;
+
+  return listing;
 }

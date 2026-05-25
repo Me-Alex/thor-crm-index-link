@@ -22,6 +22,9 @@ describe("handleFetchMessage", () => {
       if (url.includes("/rest/v1/canonical_listings")) {
         return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
       }
+      if (url.includes("/rest/v1/alerts")) {
+        return Response.json([]);
+      }
       return new Response(JSON.stringify([{ id: "source-listing-id" }]), {
         status: 201,
         headers: { "content-type": "application/json" }
@@ -40,7 +43,7 @@ describe("handleFetchMessage", () => {
       { fetch: fetchMock }
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
     expect(writes[0]).toEqual({
       url: "https://project.supabase.co/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key",
       method: "POST",
@@ -84,6 +87,9 @@ describe("handleFetchMessage", () => {
       if (String(input).includes("/rest/v1/canonical_listings")) {
         return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
       }
+      if (String(input).includes("/rest/v1/alerts")) {
+        return Response.json([]);
+      }
 
       return Response.json([{ id: "source-listing-id" }], { status: 201 });
     });
@@ -105,7 +111,8 @@ describe("handleFetchMessage", () => {
       expect.stringContaining("https://project.supabase.co/rest/v1/canonical_listings"),
       "https://project.supabase.co/rest/v1/canonical_listings",
       "https://project.supabase.co/rest/v1/canonical_listing_links?on_conflict=source_listing_id",
-      "https://project.supabase.co/rest/v1/listing_history"
+      "https://project.supabase.co/rest/v1/listing_history",
+      "https://project.supabase.co/rest/v1/alerts?select=id%2Corg_id%2Csaved_search_id%2Cchannel%2Cis_enabled&is_enabled=eq.true&channel=eq.in_app"
     ]);
   });
 
@@ -148,6 +155,9 @@ describe("handleFetchMessage", () => {
       if (url.includes("/rest/v1/canonical_listings")) {
         return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
       }
+      if (url.includes("/rest/v1/alerts")) {
+        return Response.json([]);
+      }
 
       return Response.json([{ id: "write-ok" }], { status: 201 });
     });
@@ -169,7 +179,8 @@ describe("handleFetchMessage", () => {
       "/rest/v1/canonical_listings",
       "/rest/v1/canonical_listings",
       "/rest/v1/canonical_listing_links",
-      "/rest/v1/listing_history"
+      "/rest/v1/listing_history",
+      "/rest/v1/alerts"
     ]);
     expect(calls[2]?.body).toMatchObject({
       title: "Apartament 2 camere Titan",
@@ -225,6 +236,9 @@ describe("handleFetchMessage", () => {
           }
         ]);
       }
+      if (url.includes("/rest/v1/alerts")) {
+        return Response.json([]);
+      }
 
       return Response.json([{ id: "write-ok" }], { status: 201 });
     });
@@ -246,7 +260,8 @@ describe("handleFetchMessage", () => {
       "/rest/v1/canonical_listings",
       "/rest/v1/canonical_listings",
       "/rest/v1/canonical_listing_links",
-      "/rest/v1/listing_history"
+      "/rest/v1/listing_history",
+      "/rest/v1/alerts"
     ]);
     expect(calls[2]).toMatchObject({
       method: "PATCH",
@@ -263,6 +278,93 @@ describe("handleFetchMessage", () => {
     expect(calls[3]?.body).not.toMatchObject({
       match_reasons: ["new_canonical_listing"]
     });
+  });
+
+  it("plans saved-search alert deliveries after persisting the canonical match", async () => {
+    const calls: Array<{ url: string; method?: string; body?: unknown }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: init?.method,
+        body: init?.body ? JSON.parse(String(init.body)) : undefined
+      });
+
+      if (url.includes("/rest/v1/source_listings")) {
+        return Response.json([{ id: "source-listing-id" }], { status: 201 });
+      }
+      if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+        return Response.json([]);
+      }
+      if (url.includes("/rest/v1/canonical_listings")) {
+        return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
+      }
+      if (url.includes("/rest/v1/canonical_listing_links") || url.includes("/rest/v1/listing_history")) {
+        return Response.json([], { status: 201 });
+      }
+      if (url.includes("/rest/v1/alerts")) {
+        return Response.json([
+          {
+            id: "alert-1",
+            org_id: "tenant-a",
+            saved_search_id: "search-1",
+            channel: "in_app",
+            is_enabled: true
+          }
+        ]);
+      }
+      if (url.includes("/rest/v1/saved_searches")) {
+        return Response.json([
+          {
+            id: "search-1",
+            org_id: "tenant-a",
+            name: "Titan 2 camere",
+            criteria: {
+              cities: ["bucuresti"],
+              propertyTypes: ["apartment"],
+              transactionTypes: ["sale"],
+              priceEur: { max: 95000 },
+              keywords: ["titan"]
+            }
+          }
+        ]);
+      }
+      if (url.includes("/rest/v1/alert_deliveries") && init?.method === "GET") {
+        return Response.json([]);
+      }
+      if (url.includes("/rest/v1/alert_deliveries")) {
+        return Response.json([], { status: 201 });
+      }
+
+      throw new Error(`unexpected_url:${url}`);
+    });
+
+    await handleFetchMessage(
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: "https://example.test/listings/demo-apt-titan",
+        discoveredAt: "2026-05-25T00:00:00.000Z",
+        fixtureHtml: demoListingFixtureHtml
+      },
+      env(),
+      { fetch: fetchMock }
+    );
+
+    const alertDeliveryWrite = calls.find((call) => new URL(call.url).pathname === "/rest/v1/alert_deliveries" && call.method === "POST");
+    expect(alertDeliveryWrite?.body).toEqual([
+      {
+        org_id: "tenant-a",
+        alert_id: "alert-1",
+        canonical_listing_id: "canonical-listing-id",
+        status: "pending",
+        payload: {
+          delivery_key: "tenant-a:search-1:canonical-listing-id",
+          evaluated_at: "2026-05-25T00:00:00.000Z",
+          matched_reasons: expect.arrayContaining(["city_match", "keyword_match"])
+        }
+      }
+    ]);
   });
 });
 
@@ -383,6 +485,9 @@ describe("handleQueueBatch", () => {
       if (url.includes("/rest/v1/canonical_listings")) {
         return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
       }
+      if (url.includes("/rest/v1/alerts")) {
+        return Response.json([]);
+      }
       return Response.json([{ id: "source-listing-id" }], { status: 201 });
     });
     const ack = vi.fn();
@@ -413,7 +518,7 @@ describe("handleQueueBatch", () => {
       globalThis.fetch = originalFetch;
     }
 
-    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(fetchMock).toHaveBeenCalledTimes(6);
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();
   });

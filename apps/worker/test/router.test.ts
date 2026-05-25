@@ -125,6 +125,9 @@ describe("handleRequest", () => {
           if (url.includes("/rest/v1/canonical_listings")) {
             return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
           }
+          if (url.includes("/rest/v1/alerts")) {
+            return Response.json([]);
+          }
           return Response.json([{ id: "source-listing-id" }], { status: 201 });
         }
       }
@@ -137,7 +140,7 @@ describe("handleRequest", () => {
       url: "https://example.test/listings/demo-apt-titan",
       status: "ingested"
     });
-    expect(writes).toHaveLength(5);
+    expect(writes).toHaveLength(6);
   });
 });
 
