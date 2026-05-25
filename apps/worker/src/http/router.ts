@@ -2,6 +2,7 @@ import { demoListingFixtureHtml } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
 import { createTenantListingNote, getTenantListingWorkflow, listTenantAlertDeliveries, updateTenantListingState } from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
+import { upsertSource } from "../queue/sourceRepository";
 import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 import {
   apiCorsPreflight,
@@ -150,6 +151,24 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     if (!isAuthorizedAdmin(request, env.ADMIN_API_KEY)) {
       return unauthorized();
     }
+
+    await upsertSource(
+      env,
+      {
+        id: "demo",
+        name: "Demo Source",
+        base_url: "https://example.test",
+        robots_policy_url: "https://example.test/robots.txt",
+        mode: "off",
+        rate_limit_per_minute: 10,
+        crawl_config: {
+          adapter: "demo",
+          purpose: "fixture ingest only"
+        },
+        source_trust: 0.5
+      },
+      options
+    );
 
     await handleFetchMessage(
       {

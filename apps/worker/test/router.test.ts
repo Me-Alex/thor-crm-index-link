@@ -132,6 +132,9 @@ describe("handleRequest", () => {
             method: init?.method,
             body: init?.body ? JSON.parse(String(init.body)) : undefined
           });
+          if (url.includes("/rest/v1/sources")) {
+            return Response.json([{ id: "demo" }], { status: 201 });
+          }
           if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
             return Response.json([]);
           }
@@ -153,7 +156,16 @@ describe("handleRequest", () => {
       url: "https://example.test/listings/demo-apt-titan",
       status: "ingested"
     });
-    expect(writes).toHaveLength(6);
+    expect(writes).toHaveLength(7);
+    expect(writes[0]).toMatchObject({
+      url: "https://project.supabase.co/rest/v1/sources?on_conflict=id",
+      method: "POST",
+      body: {
+        id: "demo",
+        name: "Demo Source",
+        base_url: "https://example.test"
+      }
+    });
   });
 });
 
