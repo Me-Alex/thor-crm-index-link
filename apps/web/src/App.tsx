@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   alertDeliveries,
   demoListings,
@@ -9,10 +9,17 @@ import {
   workerHealthUrl,
   type DemoListing,
   type PropertyType,
+  type SavedSearch,
   type TransactionType
 } from "./data/demoData";
 import { filterListings, summarizeListings, type ListingFilters } from "./lib/filterListings";
 import { fetchWorkerListings, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
+import {
+  createTenantSavedSearch,
+  deleteTenantSavedSearch,
+  fetchTenantSavedSearches,
+  updateTenantSavedSearch
+} from "./lib/savedSearchesApi";
 import {
   buildDemoTenantWorkflow,
   demoOrgId,
@@ -57,6 +64,12 @@ function App() {
   const [dataMode, setDataMode] = useState<"fallback" | "live">("fallback");
   const [dataMessage, setDataMessage] = useState("Se incearca incarcarea din Worker API.");
   const [isLoadingListings, setIsLoadingListings] = useState(false);
+  const [savedSearchItems, setSavedSearchItems] = useState<SavedSearch[]>(savedSearches);
+  const [savedSearchName, setSavedSearchName] = useState("");
+  const [savedSearchCriteria, setSavedSearchCriteria] = useState("");
+  const [savedSearchFrequency, setSavedSearchFrequency] = useState<SavedSearch["frequency"]>("near real-time");
+  const [editingSavedSearchId, setEditingSavedSearchId] = useState<string | null>(null);
+  const [savedSearchMessage, setSavedSearchMessage] = useState("Saved searches demo: poti crea cautari local.");
   const [workflowItems, setWorkflowItems] = useState<TenantWorkflowItem[]>(() =>
     buildDemoTenantWorkflow(demoListings, demoTenantId)
   );
@@ -106,6 +119,35 @@ function App() {
       .finally(() => {
         if (!ignoreResult) {
           setIsLoadingListings(false);
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignoreResult = false;
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = resolveTenantWorkflowAccessToken();
+
+    if (!workerApiBaseUrl || !accessToken) {
+      return undefined;
+    }
+
+    fetchTenantSavedSearches({ baseUrl: workerApiBaseUrl, orgId: demoOrgId, accessToken })
+      .then((apiSavedSearches) => {
+        if (ignoreResult || apiSavedSearches.length === 0) {
+          return;
+        }
+
+        setSavedSearchItems(apiSavedSearches);
+        setSavedSearchMessage("Saved searches live: date incarcate din backend.");
+      })
+      .catch(() => {
+        if (!ignoreResult) {
+          setSavedSearchMessage("Saved searches demo: backendul nu este disponibil.");
         }
       });
 
@@ -208,6 +250,126 @@ function App() {
       setWorkflowActionMessage("Workflow salvat in backend.");
     } catch {
       setWorkflowActionMessage("Salvat local: endpointul backend pentru workflow nu este disponibil.");
+    }
+  };
+
+  const resetSavedSearchForm = () => {
+    setSavedSearchName("");
+    setSavedSearchCriteria("");
+    setSavedSearchFrequency("near real-time");
+    setEditingSavedSearchId(null);
+  };
+
+  const handleSavedSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = savedSearchName.trim();
+    const trimmedCriteria = savedSearchCriteria.trim();
+    if (!trimmedName || !trimmedCriteria) {
+      setSavedSearchMessage("Completeaza numele si criteriile cautarii.");
+      return;
+    }
+
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = resolveTenantWorkflowAccessToken();
+
+    if (editingSavedSearchId) {
+      const localUpdate = {
+        id: editingSavedSearchId,
+        name: trimmedName,
+        criteria: trimmedCriteria,
+        matches: 0,
+        frequency: savedSearchFrequency
+      };
+      setSavedSearchItems((currentItems) =>
+        currentItems.map((item) => (item.id === editingSavedSearchId ? localUpdate : item))
+      );
+      resetSavedSearchForm();
+      setSavedSearchMessage("Cautare actualizata local.");
+
+      if (workerApiBaseUrl && accessToken) {
+        try {
+          const apiSavedSearch = await updateTenantSavedSearch({
+            baseUrl: workerApiBaseUrl,
+            orgId: demoOrgId,
+            accessToken,
+            searchId: editingSavedSearchId,
+            name: trimmedName,
+            criteria: trimmedCriteria,
+            frequency: savedSearchFrequency
+          });
+          setSavedSearchItems((currentItems) =>
+            currentItems.map((item) => (item.id === editingSavedSearchId ? apiSavedSearch : item))
+          );
+          setSavedSearchMessage("Cautare actualizata in backend.");
+        } catch {
+          setSavedSearchMessage("Cautare actualizata local; backendul nu este disponibil.");
+        }
+      }
+      return;
+    }
+
+    const localSavedSearch = {
+      id: `local-${Date.now()}`,
+      name: trimmedName,
+      criteria: trimmedCriteria,
+      matches: 0,
+      frequency: savedSearchFrequency
+    };
+    setSavedSearchItems((currentItems) => [localSavedSearch, ...currentItems]);
+    resetSavedSearchForm();
+    setSavedSearchMessage("Cautare salvata local.");
+
+    if (workerApiBaseUrl && accessToken) {
+      try {
+        const apiSavedSearch = await createTenantSavedSearch({
+          baseUrl: workerApiBaseUrl,
+          orgId: demoOrgId,
+          accessToken,
+          name: trimmedName,
+          criteria: trimmedCriteria,
+          frequency: savedSearchFrequency
+        });
+        setSavedSearchItems((currentItems) =>
+          currentItems.map((item) => (item.id === localSavedSearch.id ? apiSavedSearch : item))
+        );
+        setSavedSearchMessage("Cautare salvata in backend.");
+      } catch {
+        setSavedSearchMessage("Cautare salvata local; backendul nu este disponibil.");
+      }
+    }
+  };
+
+  const handleSavedSearchEdit = (search: SavedSearch) => {
+    setEditingSavedSearchId(search.id);
+    setSavedSearchName(search.name);
+    setSavedSearchCriteria(search.criteria);
+    setSavedSearchFrequency(search.frequency);
+    setSavedSearchMessage(`Editezi cautarea ${search.name}.`);
+  };
+
+  const handleSavedSearchDelete = async (search: SavedSearch) => {
+    setSavedSearchItems((currentItems) => currentItems.filter((item) => item.id !== search.id));
+    if (editingSavedSearchId === search.id) {
+      resetSavedSearchForm();
+    }
+    setSavedSearchMessage("Cautare stearsa local.");
+
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = resolveTenantWorkflowAccessToken();
+    if (!workerApiBaseUrl || !accessToken || search.id.startsWith("local-")) {
+      return;
+    }
+
+    try {
+      await deleteTenantSavedSearch({
+        baseUrl: workerApiBaseUrl,
+        orgId: demoOrgId,
+        accessToken,
+        searchId: search.id
+      });
+      setSavedSearchMessage("Cautare stearsa din backend.");
+    } catch {
+      setSavedSearchMessage("Cautare stearsa local; backendul nu este disponibil.");
     }
   };
 
@@ -427,14 +589,57 @@ function App() {
 
           <section id="saved" className="panel">
             <h2>Saved Searches</h2>
+            <form className="saved-search-form" onSubmit={handleSavedSearchSubmit}>
+              <label>
+                <span>Nume cautare</span>
+                <input
+                  value={savedSearchName}
+                  onChange={(event) => setSavedSearchName(event.target.value)}
+                  placeholder="Apartamente Bucuresti sub 120k"
+                  required
+                />
+              </label>
+              <label>
+                <span>Criterii cautare</span>
+                <input
+                  value={savedSearchCriteria}
+                  onChange={(event) => setSavedSearchCriteria(event.target.value)}
+                  placeholder="sale apartment Bucuresti max 120000 EUR"
+                  required
+                />
+              </label>
+              <label>
+                <span>Frecventa alerta</span>
+                <select
+                  value={savedSearchFrequency}
+                  onChange={(event) => setSavedSearchFrequency(parseSavedSearchFrequency(event.target.value))}
+                >
+                  <option value="near real-time">near real-time</option>
+                  <option value="hourly">hourly</option>
+                  <option value="daily">daily</option>
+                </select>
+              </label>
+              <button type="submit">{editingSavedSearchId ? "Actualizeaza cautare" : "Salveaza cautare"}</button>
+            </form>
+            <p className="safe-note" role="status" aria-live="polite">
+              {savedSearchMessage}
+            </p>
             <div className="stack-list">
-              {savedSearches.map((search) => (
+              {savedSearchItems.map((search) => (
                 <article key={search.id} className="mini-card">
                   <strong>{search.name}</strong>
                   <span>{search.criteria}</span>
                   <em>
                     {search.matches} match · {search.frequency}
                   </em>
+                  <div className="inline-actions">
+                    <button type="button" aria-label={`Editeaza ${search.name}`} onClick={() => handleSavedSearchEdit(search)}>
+                      Editeaza
+                    </button>
+                    <button type="button" aria-label={`Sterge ${search.name}`} onClick={() => void handleSavedSearchDelete(search)}>
+                      Sterge
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>
@@ -565,6 +770,10 @@ function parseTransactionType(value: string): TransactionType | undefined {
 
 function parsePropertyType(value: string): PropertyType | undefined {
   return value === "apartment" || value === "house" || value === "land" || value === "commercial" || value === "other" ? value : undefined;
+}
+
+function parseSavedSearchFrequency(value: string): SavedSearch["frequency"] {
+  return value === "hourly" || value === "daily" ? value : "near real-time";
 }
 
 function omitFilter<Key extends keyof ListingFilters>(filters: ListingFilters, key: Key): ListingFilters {
