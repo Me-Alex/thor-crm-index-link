@@ -369,7 +369,11 @@ describe("handleFetchMessage", () => {
 });
 
 describe("handleDiscoverMessage", () => {
-  it("skips disabled registered real sources before fetching or enqueueing links", async () => {
+  it("skips a registered real source when operations disable it", async () => {
+    const source = getSourceRegistryEntry("olx");
+    if (!source) {
+      throw new Error("missing_test_source");
+    }
     const sent: unknown[] = [];
     const fetchMock = vi.fn();
     const testEnv = {
@@ -385,11 +389,24 @@ describe("handleDiscoverMessage", () => {
       {
         kind: "discover",
         sourceId: "olx",
-        seedUrl: "https://www.olx.ro/sitemap.xml",
+        seedUrl: "https://www.olx.ro/imobiliare/apartamente-garsoniere-de-inchiriat/bucuresti/",
         requestedAt: "2026-05-25T00:00:00.000Z"
       },
       testEnv,
-      { fetch: fetchMock }
+      {
+        fetch: fetchMock,
+        sourceLookup: (sourceId) =>
+          sourceId === "olx"
+            ? {
+                ...source,
+                mode: "off",
+                crawlConfig: {
+                  ...source.crawlConfig,
+                  allowLiveCrawl: false
+                }
+              }
+            : getSourceRegistryEntry(sourceId)
+      }
     );
 
     expect(fetchMock).not.toHaveBeenCalled();
@@ -568,6 +585,36 @@ describe("handleDiscoverMessage", () => {
 });
 
 describe("handleQueueBatch", () => {
+  it("acks discover messages that permanently find no listing links", async () => {
+    const ack = vi.fn();
+    const retry = vi.fn();
+    const sent = vi.fn();
+
+    await handleQueueBatch(
+      {
+        messages: [
+          {
+            id: "message-no-links",
+            body: {
+              kind: "discover",
+              sourceId: "demo",
+              seedUrl: "https://example.test/listings",
+              requestedAt: "2026-05-25T00:00:00.000Z",
+              fixtureHtml: "<html><body>No real-estate links here</body></html>"
+            },
+            ack,
+            retry
+          }
+        ]
+      } as unknown as MessageBatch,
+      { ...env(), FETCH_QUEUE: { send: sent } as unknown as Queue }
+    );
+
+    expect(ack).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
+    expect(sent).not.toHaveBeenCalled();
+  });
+
   it("acks permanent fetch failures instead of retrying poison messages", async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn(async () => new Response("x".repeat(1_000_001), { headers: { "content-length": "1000001" } }));
@@ -600,6 +647,40 @@ describe("handleQueueBatch", () => {
 
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();
+  });
+
+  it("retries temporary fetch failures from upstream sources", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async () => new Response("temporarily unavailable", { status: 503 }));
+    const ack = vi.fn();
+    const retry = vi.fn();
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      await handleQueueBatch(
+        {
+          messages: [
+            {
+              id: "message-temporary-failure",
+              body: {
+                kind: "fetch",
+                sourceId: "demo",
+                url: "https://example.test/listings/demo-apt-titan",
+                discoveredAt: "2026-05-25T00:00:00.000Z"
+              },
+              ack,
+              retry
+            }
+          ]
+        } as unknown as MessageBatch,
+        env()
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(ack).not.toHaveBeenCalled();
+    expect(retry).toHaveBeenCalledOnce();
   });
 
   it("acks fetch messages after the fixture pipeline persists them", async () => {

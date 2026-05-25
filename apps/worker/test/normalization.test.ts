@@ -60,6 +60,25 @@ describe("normalizeListingObservation", () => {
     expect(normalized.transactionType).toBe("rent");
     expect(normalized.city).toBe("cluj napoca");
   });
+
+  it("parses Romanian decimal formats and short real-estate wording", () => {
+    const normalized = normalizeListingObservation({
+      sourceId: "portal-test",
+      url: "https://example.test/listing",
+      title: "Persoana fizica inchiriez ap 2 camere",
+      description: "Suprafata utila 72.99 mp, pret 1.250,50 EUR",
+      priceText: "1.250,50 EUR",
+      areaText: "72.99 mp",
+      roomsText: "2 camere",
+      propertyTypeText: "ap",
+      transactionTypeText: "inchiriez"
+    });
+
+    expect(normalized.priceEur).toBe(1250.5);
+    expect(normalized.areaSqm).toBe(72.99);
+    expect(normalized.propertyType).toBe("apartment");
+    expect(normalized.transactionType).toBe("rent");
+  });
 });
 
 describe("chooseCanonicalField", () => {

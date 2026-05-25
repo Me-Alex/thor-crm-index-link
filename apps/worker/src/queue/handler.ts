@@ -36,10 +36,17 @@ async function handleQueueMessage(body: QueueBody, env: Env): Promise<void> {
 
 function isPermanentQueueError(error: unknown): boolean {
   const message = error instanceof Error ? error.message : String(error);
+  const htmlFetchStatus = message.match(/^html_fetch_failed:(\d{3})$/u)?.[1];
+  const isPermanentHttpFailure = htmlFetchStatus ? Number(htmlFetchStatus) >= 400 && Number(htmlFetchStatus) < 500 && Number(htmlFetchStatus) !== 429 : false;
+
   return (
     message === "html_fetch_too_large" ||
+    isPermanentHttpFailure ||
     message.startsWith("listing_parse_failed:") ||
+    message === "listing_discover_failed:missing_listing_links" ||
     message === "unapproved_seed_url" ||
+    message === "invalid_crawl_url" ||
+    message === "unsupported_crawl_url_protocol" ||
     message.startsWith("robots_disallowed_seed_url:")
   );
 }

@@ -100,7 +100,7 @@ Acest endpoint:
 
 - inserează sau actualizează sursele din registry în `public.sources`;
 - nu pornește crawling real;
-- păstrează portalurile reale neactivate pe `mode = off` și `allowLiveCrawl = false`;
+- sincronizează starea operațională din registry, inclusiv portalurile reale aprobate pentru crawl inițial controlat;
 - este pasul corect înainte de review operațional, fixture tests și activare graduală.
 
 Sursele reale incluse în registry sunt:
@@ -114,7 +114,7 @@ Sursele reale incluse în registry sunt:
 - `anuntul`
 - `lajumate`
 
-`imobiliare` este activat pentru crawl inițial controlat. Pentru orice altă activare reală, modifică o singură sursă pe rând după review, setează `mode = on` și `allowLiveCrawl = true` printr-un PR auditat, apoi verifică logs, queue backlog, parse coverage și match rate.
+Toate sursele reale din registry sunt activate pentru crawl inițial controlat cu `mode = on`, `allowLiveCrawl = true` și limite mici pe seed/detail URLs. Dacă o sursă produce `429`, `503`, erori de robots sau parse coverage slab, setează rapid `mode = degraded` sau `off`, rulează din nou bootstrap-ul și verifică logs, queue backlog, parse coverage și match rate.
 
 ## Cloudflare Pages
 

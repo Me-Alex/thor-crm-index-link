@@ -137,10 +137,12 @@ function parseDecimal(value: string | undefined): number | undefined {
 
   const compact = match[0].replace(/\s/g, "");
   const decimalComma = /,\d{1,2}$/.test(compact);
-  const decimalDot = /\.\d{1,2}$/.test(compact) && !compact.includes(",");
-  const normalized = compact
-    .replace(decimalComma ? /\./g : /[.,](?=\d{3}(\D|$))/g, "")
-    .replace(decimalComma ? "," : decimalDot ? "" : ",", ".");
+  const decimalDot = /\.\d{1,2}$/.test(compact) && !decimalComma;
+  const normalized = decimalComma
+    ? compact.replace(/\./g, "").replace(",", ".")
+    : decimalDot
+      ? compact.replace(/,/g, "")
+      : compact.replace(/[.,](?=\d{3}(\D|$))/g, "").replace(/,/g, ".");
   const parsed = Number.parseFloat(normalized);
 
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -166,7 +168,7 @@ function parseFloor(value: string | undefined): number | undefined {
 
 function normalizePropertyType(value: string | undefined, fallback: string): PropertyType {
   const text = normalizeSearchText(`${value ?? ""} ${fallback}`);
-  if (/\b(apartament|garsoniera|studio)\b/.test(text)) {
+  if (/\b(ap|apartament|garsoniera|studio)\b/.test(text)) {
     return "apartment";
   }
   if (/\b(casa|vila|duplex)\b/.test(text)) {
@@ -183,7 +185,7 @@ function normalizePropertyType(value: string | undefined, fallback: string): Pro
 
 function normalizeTransactionType(value: string | undefined, fallback: string): TransactionType {
   const text = normalizeSearchText(`${value ?? ""} ${fallback}`);
-  return /\b(inchiriere|inchiriat|chirie|rent)\b/.test(text) ? "rent" : "sale";
+  return /\b(inchiriere|inchiriat|inchiriez|inchiriaza|inchiriem|chirie|rent)\b/.test(text) ? "rent" : "sale";
 }
 
 function fingerprint(value: string): string {
