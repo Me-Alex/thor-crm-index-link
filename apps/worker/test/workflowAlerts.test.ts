@@ -23,6 +23,7 @@ const matchingSearch: SavedSearch = {
   tenantId: "tenant-a",
   name: "Titan 2 camere",
   alertsEnabled: true,
+  alertChannel: "in_app",
   criteria: {
     cities: ["bucuresti"],
     districts: ["sector 3"],
@@ -100,6 +101,33 @@ describe("planAlertDeliveries", () => {
     });
   });
 
+  it("plans email and webhook alert deliveries as separate channels", () => {
+    const result = planAlertDeliveries({
+      tenantId: "tenant-a",
+      changedListings: [titanListing],
+      savedSearches: [
+        {
+          ...matchingSearch,
+          savedSearchId: "search-email",
+          alertChannel: "email"
+        },
+        {
+          ...matchingSearch,
+          savedSearchId: "search-webhook",
+          alertChannel: "webhook"
+        }
+      ],
+      existingDeliveries: [],
+      evaluatedAt: "2026-05-25T08:00:00.000Z"
+    });
+
+    expect(result.map((delivery) => delivery.channel)).toEqual(["email", "webhook"]);
+    expect(result.map((delivery) => delivery.deliveryKey)).toEqual([
+      "tenant-a:search-email:canon-titan-1:email",
+      "tenant-a:search-webhook:canon-titan-1:webhook"
+    ]);
+  });
+
   it("does not plan a duplicate alert for the same tenant, search, and listing", () => {
     const result = planAlertDeliveries({
       tenantId: "tenant-a",
@@ -109,7 +137,8 @@ describe("planAlertDeliveries", () => {
         {
           tenantId: "tenant-a",
           savedSearchId: "search-1",
-          canonicalListingId: "canon-titan-1"
+          canonicalListingId: "canon-titan-1",
+          channel: "in_app"
         }
       ],
       evaluatedAt: "2026-05-25T08:00:00.000Z"
@@ -120,7 +149,7 @@ describe("planAlertDeliveries", () => {
 });
 
 describe("planAndPersistAlertDeliveriesForListing", () => {
-  it("loads saved searches and inserts pending in-app alert deliveries for matching tenants", async () => {
+  it("loads saved searches and inserts pending alert deliveries for matching tenants and channels", async () => {
     const calls: Array<{ url: string; method?: string; body?: unknown }> = [];
     const fetchMock = async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
@@ -153,7 +182,7 @@ describe("planAndPersistAlertDeliveriesForListing", () => {
             id: "alert-1",
             org_id: "tenant-a",
             saved_search_id: "search-1",
-            channel: "in_app",
+            channel: "webhook",
             is_enabled: true
           }
         ]);
@@ -200,7 +229,8 @@ describe("planAndPersistAlertDeliveriesForListing", () => {
           canonical_listing_id: "canon-titan-1",
           status: "pending",
           payload: {
-            delivery_key: "tenant-a:search-1:canon-titan-1",
+            delivery_key: "tenant-a:search-1:canon-titan-1:webhook",
+            channel: "webhook",
             evaluated_at: "2026-05-25T08:00:00.000Z",
             matched_reasons: expect.arrayContaining(["city_match", "keyword_match"])
           }

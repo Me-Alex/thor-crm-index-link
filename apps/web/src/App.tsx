@@ -14,6 +14,7 @@ import {
 } from "./lib/supabaseAuth";
 import {
   buildDemoTenantWorkflow,
+  createTenantWorkflowNote,
   demoOrgId,
   demoTenantId,
   fetchTenantWorkflow,
@@ -34,6 +35,8 @@ function App() {
   const [savedSearchName, setSavedSearchName] = useState("");
   const [savedSearchCriteria, setSavedSearchCriteria] = useState("");
   const [savedSearchFrequency, setSavedSearchFrequency] = useState<SavedSearch["frequency"]>("near real-time");
+  const [savedSearchAlertChannel, setSavedSearchAlertChannel] = useState<SavedSearch["alertChannel"]>("in_app");
+  const [savedSearchAlertsEnabled, setSavedSearchAlertsEnabled] = useState(true);
   const [editingSavedSearchId, setEditingSavedSearchId] = useState<string | null>(null);
   const [savedSearchMessage, setSavedSearchMessage] = useState("Saved searches demo: poti crea cautari local.");
   const [authSession, setAuthSession] = useState(getStoredSupabaseAuthSession);
@@ -280,7 +283,65 @@ function App() {
     setSavedSearchName("");
     setSavedSearchCriteria("");
     setSavedSearchFrequency("near real-time");
+    setSavedSearchAlertChannel("in_app");
+    setSavedSearchAlertsEnabled(true);
     setEditingSavedSearchId(null);
+  };
+
+  const handleWorkflowNoteCreate = async (listingId: string, body: string) => {
+    const trimmedBody = body.trim();
+    const workflowItem = workflowItems.find((item) => item.listingId === listingId);
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
+
+    if (!trimmedBody) {
+      setWorkflowActionMessage("Nota nu poate fi goala.");
+      return;
+    }
+
+    const localNote = {
+      id: `local-note-${Date.now()}`,
+      body: trimmedBody,
+      authorUserId: authSession?.email ?? "local-user",
+      createdAt: new Date().toISOString()
+    };
+
+    setWorkflowItems((currentItems) =>
+      currentItems.map((currentItem) =>
+        currentItem.listingId === listingId
+          ? { ...currentItem, notes: [localNote, ...currentItem.notes], updatedAt: localNote.createdAt }
+          : currentItem
+      )
+    );
+    setWorkflowActionMessage("Nota salvata local.");
+
+    if (!workflowItem || !workerApiBaseUrl || !accessToken) {
+      return;
+    }
+
+    try {
+      const apiNote = await createTenantWorkflowNote({
+        baseUrl: workerApiBaseUrl,
+        orgId: workflowItem.orgId,
+        listingId,
+        body: trimmedBody,
+        accessToken
+      });
+      setWorkflowItems((currentItems) =>
+        currentItems.map((currentItem) =>
+          currentItem.listingId === listingId
+            ? {
+                ...currentItem,
+                notes: currentItem.notes.map((note) => (note.id === localNote.id ? apiNote : note)),
+                updatedAt: apiNote.createdAt
+              }
+            : currentItem
+        )
+      );
+      setWorkflowActionMessage("Nota salvata in backend.");
+    } catch {
+      setWorkflowActionMessage("Nota salvata local; backendul nu este disponibil.");
+    }
   };
 
   const handleSavedSearchSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -302,7 +363,9 @@ function App() {
         name: trimmedName,
         criteria: trimmedCriteria,
         matches: 0,
-        frequency: savedSearchFrequency
+        frequency: savedSearchFrequency,
+        alertChannel: savedSearchAlertChannel,
+        alertsEnabled: savedSearchAlertsEnabled
       };
       setSavedSearchItems((currentItems) =>
         currentItems.map((item) => (item.id === editingSavedSearchId ? localUpdate : item))
@@ -319,7 +382,9 @@ function App() {
             searchId: editingSavedSearchId,
             name: trimmedName,
             criteria: trimmedCriteria,
-            frequency: savedSearchFrequency
+            frequency: savedSearchFrequency,
+            alertChannel: savedSearchAlertChannel,
+            alertsEnabled: savedSearchAlertsEnabled
           });
           setSavedSearchItems((currentItems) =>
             currentItems.map((item) => (item.id === editingSavedSearchId ? apiSavedSearch : item))
@@ -337,7 +402,9 @@ function App() {
       name: trimmedName,
       criteria: trimmedCriteria,
       matches: 0,
-      frequency: savedSearchFrequency
+      frequency: savedSearchFrequency,
+      alertChannel: savedSearchAlertChannel,
+      alertsEnabled: savedSearchAlertsEnabled
     };
     setSavedSearchItems((currentItems) => [localSavedSearch, ...currentItems]);
     resetSavedSearchForm();
@@ -351,7 +418,9 @@ function App() {
           accessToken,
           name: trimmedName,
           criteria: trimmedCriteria,
-          frequency: savedSearchFrequency
+          frequency: savedSearchFrequency,
+          alertChannel: savedSearchAlertChannel,
+          alertsEnabled: savedSearchAlertsEnabled
         });
         setSavedSearchItems((currentItems) =>
           currentItems.map((item) => (item.id === localSavedSearch.id ? apiSavedSearch : item))
@@ -368,6 +437,8 @@ function App() {
     setSavedSearchName(search.name);
     setSavedSearchCriteria(search.criteria);
     setSavedSearchFrequency(search.frequency);
+    setSavedSearchAlertChannel(search.alertChannel);
+    setSavedSearchAlertsEnabled(search.alertsEnabled);
     setSavedSearchMessage(`Editezi cautarea ${search.name}.`);
   };
 
@@ -447,10 +518,13 @@ function App() {
       savedSearchName={savedSearchName}
       savedSearchCriteria={savedSearchCriteria}
       savedSearchFrequency={savedSearchFrequency}
+      savedSearchAlertChannel={savedSearchAlertChannel}
+      savedSearchAlertsEnabled={savedSearchAlertsEnabled}
       savedSearchMessage={savedSearchMessage}
       editingSavedSearchId={editingSavedSearchId}
       onRefreshListings={() => void loadListings()}
       onWorkflowStatusChange={handleWorkflowStatusChange}
+      onWorkflowNoteCreate={(listingId, body) => void handleWorkflowNoteCreate(listingId, body)}
       onAuthEmailChange={setAuthEmail}
       onAuthPasswordChange={setAuthPassword}
       onAuthSubmit={handleSupabaseLogin}
@@ -458,6 +532,8 @@ function App() {
       onSavedSearchNameChange={setSavedSearchName}
       onSavedSearchCriteriaChange={setSavedSearchCriteria}
       onSavedSearchFrequencyChange={setSavedSearchFrequency}
+      onSavedSearchAlertChannelChange={setSavedSearchAlertChannel}
+      onSavedSearchAlertsEnabledChange={setSavedSearchAlertsEnabled}
       onSavedSearchSubmit={handleSavedSearchSubmit}
       onSavedSearchEdit={handleSavedSearchEdit}
       onSavedSearchDelete={(search) => void handleSavedSearchDelete(search)}

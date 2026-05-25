@@ -41,6 +41,7 @@ export interface SpatialSourceHealthDetail {
   latestSeenAt?: string;
   crawlSuccessRate: number;
   parseSuccessRate: number;
+  fieldCoverageRate: number;
   matchRate: number;
   timeToIndexMinutes: number;
 }

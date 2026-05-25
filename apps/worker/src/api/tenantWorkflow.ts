@@ -369,23 +369,34 @@ export async function updateTenantSavedSearch(
   if (parsedBody.criteria) {
     payload.criteria = parsedBody.criteria;
   }
-  if (Object.keys(payload).length === 0) {
+  const shouldUpdateSavedSearch = Object.keys(payload).length > 0;
+  if (!shouldUpdateSavedSearch && !parsedBody.alert) {
     return badRequest("No supported saved search fields provided");
   }
 
   try {
-    const searchRows = await updateRows<SavedSearchRow>(
-      env,
-      options,
-      "saved_searches",
-      payload,
-      {
-        org_id: `eq.${orgId}`,
-        id: `eq.${savedSearchId}`
-      },
-      "return=representation"
-    );
-    const alertRows = await getAlertsForSavedSearches(env, options, orgId, searchRows);
+    const searchRows = shouldUpdateSavedSearch
+      ? await updateRows<SavedSearchRow>(
+          env,
+          options,
+          "saved_searches",
+          payload,
+          {
+            org_id: `eq.${orgId}`,
+            id: `eq.${savedSearchId}`
+          },
+          "return=representation"
+        )
+      : await queryRows<SavedSearchRow>(env, options, "saved_searches", {
+          select: "id,org_id,name,criteria,created_at,updated_at",
+          org_id: `eq.${orgId}`,
+          id: `eq.${savedSearchId}`,
+          limit: "1"
+        });
+    const existingAlertRows = await getAlertsForSavedSearches(env, options, orgId, searchRows);
+    const alertRows = parsedBody.alert
+      ? await upsertSavedSearchAlert(env, options, orgId, savedSearchId, parsedBody.alert, existingAlertRows)
+      : existingAlertRows;
 
     return jsonResponse({
       data: mapRequiredSavedSearch(searchRows[0], alertRows)
@@ -393,6 +404,50 @@ export async function updateTenantSavedSearch(
   } catch (error) {
     return supabaseFailureResponse(error);
   }
+}
+
+async function upsertSavedSearchAlert(
+  env: Env,
+  options: TenantWorkflowApiOptions,
+  orgId: string,
+  savedSearchId: string,
+  alert: SavedSearchAlertInput,
+  existingAlerts: readonly SavedSearchAlertRow[]
+): Promise<SavedSearchAlertRow[]> {
+  const payload = {
+    channel: alert.channel,
+    frequency: alert.frequency,
+    threshold_minutes: alert.thresholdMinutes,
+    is_enabled: alert.isEnabled,
+    config: alert.config
+  };
+  const existingAlert = existingAlerts[0];
+  if (existingAlert) {
+    return updateRows<SavedSearchAlertRow>(
+      env,
+      options,
+      "alerts",
+      payload,
+      {
+        org_id: `eq.${orgId}`,
+        id: `eq.${existingAlert.id}`
+      },
+      "return=representation"
+    );
+  }
+
+  return writeRows<SavedSearchAlertRow>(
+    env,
+    options,
+    "alerts",
+    {
+      org_id: orgId,
+      saved_search_id: savedSearchId,
+      ...payload
+    },
+    {},
+    "return=representation"
+  );
 }
 
 export async function deleteTenantSavedSearch(

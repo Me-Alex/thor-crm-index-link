@@ -42,6 +42,8 @@ export interface SavedSearch {
   criteria: string;
   matches: number;
   frequency: "near real-time" | "hourly" | "daily";
+  alertChannel: "in_app" | "email" | "webhook";
+  alertsEnabled: boolean;
 }
 
 export interface AlertDelivery {
@@ -60,6 +62,7 @@ export interface SourceHealth {
   latestSeenAt?: string;
   crawlSuccessRate: number;
   parseSuccessRate: number;
+  fieldCoverageRate: number;
   matchRate: number;
   timeToIndexMinutes: number;
 }
@@ -194,14 +197,18 @@ export const savedSearches: SavedSearch[] = [
     name: "Bucuresti apartamente sub 120k",
     criteria: "sale · apartment · Bucuresti · max 120.000 EUR",
     matches: 1,
-    frequency: "near real-time"
+    frequency: "near real-time",
+    alertChannel: "in_app",
+    alertsEnabled: true
   },
   {
     id: "ss-inchirieri-premium",
     name: "Inchirieri premium nord",
     criteria: "rent · apartment · Sector 1 · min 600 EUR",
     matches: 1,
-    frequency: "hourly"
+    frequency: "hourly",
+    alertChannel: "email",
+    alertsEnabled: true
   }
 ];
 
@@ -229,6 +236,7 @@ export const sourceHealth: SourceHealth[] = [
     mode: "on",
     crawlSuccessRate: 0.96,
     parseSuccessRate: 0.91,
+    fieldCoverageRate: 0.88,
     matchRate: 0.42,
     timeToIndexMinutes: 4
   },
@@ -238,6 +246,7 @@ export const sourceHealth: SourceHealth[] = [
     mode: "degraded",
     crawlSuccessRate: 0.78,
     parseSuccessRate: 0.72,
+    fieldCoverageRate: 0.64,
     matchRate: 0.31,
     timeToIndexMinutes: 9
   },
@@ -247,6 +256,7 @@ export const sourceHealth: SourceHealth[] = [
     mode: "off",
     crawlSuccessRate: 1,
     parseSuccessRate: 1,
+    fieldCoverageRate: 1,
     matchRate: 0,
     timeToIndexMinutes: 0
   }

@@ -3,6 +3,7 @@ import { ListingsApiError, resolveWorkerApiBaseUrl } from "./listingsApi";
 import { demoOrgId } from "./tenantWorkflowApi";
 
 type WorkerAlertFrequency = "near_real_time" | "hourly" | "daily";
+type WorkerAlertChannel = "in_app" | "email" | "webhook";
 
 interface WorkerSavedSearchResponse {
   data: WorkerSavedSearch[];
@@ -18,7 +19,9 @@ interface WorkerSavedSearch {
   name: string;
   criteria: Record<string, unknown>;
   alerts: Array<{
+    channel: WorkerAlertChannel;
     frequency: WorkerAlertFrequency;
+    isEnabled: boolean;
   }>;
 }
 
@@ -33,6 +36,8 @@ export interface SavedSearchMutationOptions extends SavedSearchApiOptions {
   name: string;
   criteria: string;
   frequency: SavedSearch["frequency"];
+  alertChannel: SavedSearch["alertChannel"];
+  alertsEnabled: boolean;
 }
 
 export interface UpdateSavedSearchOptions extends SavedSearchMutationOptions {
@@ -122,10 +127,10 @@ function savedSearchRequestBody(options: SavedSearchMutationOptions): string {
     name: options.name,
     criteria: { query: options.criteria },
     alert: {
-      channel: "in_app",
+      channel: options.alertChannel,
       frequency: toWorkerFrequency(options.frequency),
       thresholdMinutes: 5,
-      isEnabled: true
+      isEnabled: options.alertsEnabled
     }
   });
 }
@@ -144,7 +149,9 @@ function toSavedSearch(search: WorkerSavedSearch): SavedSearch {
     name: search.name,
     criteria: criteriaSummary(search.criteria),
     matches: 0,
-    frequency: fromWorkerFrequency(search.alerts[0]?.frequency ?? "daily")
+    frequency: fromWorkerFrequency(search.alerts[0]?.frequency ?? "daily"),
+    alertChannel: search.alerts[0]?.channel ?? "in_app",
+    alertsEnabled: search.alerts[0]?.isEnabled ?? false
   };
 }
 
@@ -180,11 +187,15 @@ function isWorkerSavedSearch(value: unknown): value is WorkerSavedSearch {
 }
 
 function isWorkerSavedSearchAlert(value: unknown): value is WorkerSavedSearch["alerts"][number] {
-  return isRecord(value) && isWorkerAlertFrequency(value.frequency);
+  return isRecord(value) && isWorkerAlertChannel(value.channel) && isWorkerAlertFrequency(value.frequency) && typeof value.isEnabled === "boolean";
 }
 
 function isWorkerAlertFrequency(value: unknown): value is WorkerAlertFrequency {
   return value === "near_real_time" || value === "hourly" || value === "daily";
+}
+
+function isWorkerAlertChannel(value: unknown): value is WorkerAlertChannel {
+  return value === "in_app" || value === "email" || value === "webhook";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

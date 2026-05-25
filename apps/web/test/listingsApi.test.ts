@@ -119,6 +119,7 @@ describe("fetchWorkerSourceHealth", () => {
               latestSeenAt: "2026-05-25T11:25:50.000Z",
               crawlSuccessRate: 1,
               parseSuccessRate: 0.75,
+              fieldCoverageRate: 0.5,
               matchRate: 0,
               timeToIndexMinutes: 6
             }
@@ -141,6 +142,7 @@ describe("fetchWorkerSourceHealth", () => {
         latestSeenAt: "2026-05-25T11:25:50.000Z",
         crawlSuccessRate: 1,
         parseSuccessRate: 0.75,
+        fieldCoverageRate: 0.5,
         matchRate: 0,
         timeToIndexMinutes: 6
       }

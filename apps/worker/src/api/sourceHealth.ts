@@ -16,6 +16,7 @@ interface SourceListingHealthRow {
   source_id: string;
   last_seen_at: string | null;
   crawl_status: "new" | "active" | "stale" | "removed" | "parse_failed";
+  normalized_payload: Record<string, unknown> | null;
 }
 
 interface CanonicalListingLinkHealthRow {
@@ -30,6 +31,7 @@ interface SourceHealthCard {
   latestSeenAt: string | null;
   crawlSuccessRate: number;
   parseSuccessRate: number;
+  fieldCoverageRate: number;
   matchRate: number;
   timeToIndexMinutes: number;
 }
@@ -56,7 +58,7 @@ export async function listSourceHealth(env: Env, options: SourceHealthOptions = 
     }),
     fetcher(
       sourceHealthUrl(env, "/rest/v1/source_listings", {
-        select: "id,source_id,last_seen_at,crawl_status",
+        select: "id,source_id,last_seen_at,crawl_status,normalized_payload",
         order: "last_seen_at.desc",
         limit: "2000"
       }),
@@ -132,6 +134,7 @@ function toSourceHealthCard(
   const parseFailedCount = sourceListings.filter((listing) => listing.crawl_status === "parse_failed").length;
   const parsedTotal = activeCount + parseFailedCount;
   const linkedCount = sourceListings.filter((listing) => linkedSourceListingIds.has(listing.id)).length;
+  const fieldCoverageRate = averageFieldCoverage(sourceListings);
 
   return {
     id: source.id,
@@ -141,6 +144,7 @@ function toSourceHealthCard(
     latestSeenAt,
     crawlSuccessRate: sourceListings.length > 0 ? 1 : 0,
     parseSuccessRate: parsedTotal > 0 ? activeCount / parsedTotal : 0,
+    fieldCoverageRate,
     matchRate: sourceListings.length > 0 ? linkedCount / sourceListings.length : 0,
     timeToIndexMinutes: latestSeenAt ? Math.max(0, Math.round((now.getTime() - Date.parse(latestSeenAt)) / 60000)) : 0
   };
@@ -161,8 +165,24 @@ function isSourceListingHealthRow(value: unknown): value is SourceListingHealthR
     typeof value.id === "string" &&
     typeof value.source_id === "string" &&
     (value.last_seen_at === null || typeof value.last_seen_at === "string") &&
-    isCrawlStatus(value.crawl_status)
+    isCrawlStatus(value.crawl_status) &&
+    (value.normalized_payload === null || isRecord(value.normalized_payload))
   );
+}
+
+function averageFieldCoverage(listings: readonly SourceListingHealthRow[]): number {
+  if (listings.length === 0) {
+    return 0;
+  }
+
+  const requiredFields = ["priceEur", "areaSqm", "rooms", "city"] as const;
+  const totalCoverage = listings.reduce((sum, listing) => {
+    const payload = listing.normalized_payload ?? {};
+    const coveredFields = requiredFields.filter((field) => payload[field] !== undefined && payload[field] !== null && payload[field] !== "").length;
+    return sum + coveredFields / requiredFields.length;
+  }, 0);
+
+  return Number((totalCoverage / listings.length).toFixed(2));
 }
 
 function isCanonicalListingLinkHealthRow(value: unknown): value is CanonicalListingLinkHealthRow {

@@ -456,7 +456,7 @@ describe("tenant workflow API", () => {
     });
   });
 
-  it("updates and deletes saved searches for an org member", async () => {
+  it("updates saved search criteria and alert configuration for an org member", async () => {
     const savedSearchId = "99999999-9999-4999-8999-999999999999";
     const updateFetchMock = vi
       .fn()
@@ -474,14 +474,44 @@ describe("tenant workflow API", () => {
           }
         ])
       )
-      .mockResolvedValueOnce(Response.json([]));
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            saved_search_id: savedSearchId,
+            channel: "in_app",
+            frequency: "near_real_time",
+            threshold_minutes: 5,
+            is_enabled: true
+          }
+        ])
+      )
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            saved_search_id: savedSearchId,
+            channel: "webhook",
+            frequency: "daily",
+            threshold_minutes: 15,
+            is_enabled: false
+          }
+        ])
+      );
 
     const updateResponse = await handleRequest(
       authorizedRequest(`https://worker.test/api/orgs/${orgId}/saved-searches/${savedSearchId}`, {
         method: "PATCH",
         body: JSON.stringify({
           name: "Bucuresti actualizat",
-          criteria: { city: "bucuresti", maxPriceEur: 130000 }
+          criteria: { city: "bucuresti", maxPriceEur: 130000 },
+          alert: {
+            channel: "webhook",
+            frequency: "daily",
+            thresholdMinutes: 15,
+            isEnabled: false,
+            config: { url: "https://hooks.example.test/thor" }
+          }
         })
       }),
       env(),
@@ -493,11 +523,31 @@ describe("tenant workflow API", () => {
       data: {
         id: savedSearchId,
         name: "Bucuresti actualizat",
-        criteria: { city: "bucuresti", maxPriceEur: 130000 }
+        criteria: { city: "bucuresti", maxPriceEur: 130000 },
+        alerts: [
+          {
+            id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+            channel: "webhook",
+            frequency: "daily",
+            thresholdMinutes: 15,
+            isEnabled: false
+          }
+        ]
       }
     });
     expect(updateFetchMock.mock.calls[2]?.[1]?.method).toBe("PATCH");
+    expect(updateFetchMock.mock.calls[4]?.[1]?.method).toBe("PATCH");
+    expect(JSON.parse(String(updateFetchMock.mock.calls[4]?.[1]?.body))).toEqual({
+      channel: "webhook",
+      frequency: "daily",
+      threshold_minutes: 15,
+      is_enabled: false,
+      config: { url: "https://hooks.example.test/thor" }
+    });
+  });
 
+  it("deletes saved searches for an org member", async () => {
+    const savedSearchId = "99999999-9999-4999-8999-999999999999";
     const deleteFetchMock = vi
       .fn()
       .mockResolvedValueOnce(Response.json({ id: userId }))

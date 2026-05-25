@@ -205,13 +205,24 @@
 }
 
 .utility-form input,
-.utility-form select {
+.utility-form select,
+.utility-form textarea {
   width: 100%;
   border: 1px solid var(--spatial-border);
   border-radius: 0.75rem;
   color: var(--spatial-text);
   background: #ffffff;
   padding: 0.55rem 0.65rem;
+}
+
+.utility-check {
+  align-items: center;
+  display: flex !important;
+  gap: 0.5rem;
+}
+
+.utility-check input {
+  width: auto;
 }
 
 .utility-form button,
@@ -439,6 +450,60 @@
 .source-health-details span {
   color: var(--spatial-muted);
   font-size: 0.78rem;
+}
+
+.workflow-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.workflow-tags span {
+  border: 1px solid var(--spatial-border);
+  border-radius: 999px;
+  color: var(--spatial-text);
+  font-size: 0.75rem;
+  padding: 0.2rem 0.55rem;
+}
+
+.workflow-notes {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.workflow-notes article,
+.workflow-note-form {
+  border: 1px solid var(--spatial-border);
+  border-radius: 0.9rem;
+  background: #ffffff;
+  padding: 0.65rem;
+}
+
+.workflow-notes p {
+  margin: 0;
+}
+
+.workflow-notes time {
+  color: var(--spatial-muted);
+  font-size: 0.72rem;
+}
+
+.workflow-note-form {
+  display: grid;
+  gap: 0.55rem;
+  margin-top: 0.75rem;
+}
+
+.workflow-note-form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.workflow-note-form textarea {
+  min-height: 4.5rem;
+  resize: vertical;
 }
 
 .source-links a {

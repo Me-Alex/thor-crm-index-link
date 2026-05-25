@@ -1,5 +1,6 @@
 import { demoListingFixtureHtml, sourceRegistry } from "@thor-crm/adapters";
 import type { SourceRegistryEntry } from "@thor-crm/adapters";
+import { listDedupReviewLinks } from "../api/dedupReview";
 import { getListingById, listListings } from "../api/listings";
 import { listSourceHealth } from "../api/sourceHealth";
 import {
@@ -13,10 +14,11 @@ import {
   updateTenantSavedSearch
 } from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
-import { upsertSource, type SourceWrite } from "../queue/sourceRepository";
+import { updateSourceMode, upsertSource, type SourceWrite } from "../queue/sourceRepository";
 import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 import {
   apiCorsPreflight,
+  badRequest,
   jsonResponse,
   methodNotAllowed,
   notFound,
@@ -278,7 +280,58 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     });
   }
 
+  const sourceModeMatch = url.pathname.match(/^\/admin\/sources\/([^/]+)\/mode$/);
+  if (sourceModeMatch) {
+    if (request.method !== "PATCH") {
+      return methodNotAllowed();
+    }
+
+    if (!isAuthorizedAdmin(request, env.ADMIN_API_KEY)) {
+      return unauthorized();
+    }
+
+    const mode = await parseSourceModeBody(request);
+    if (mode instanceof Response) {
+      return mode;
+    }
+
+    const sourceId = decodeURIComponent(sourceModeMatch[1] ?? "");
+    await updateSourceMode(env, sourceId, mode, options);
+
+    return jsonResponse({
+      ok: true,
+      sourceId,
+      mode,
+      status: "source_mode_updated"
+    });
+  }
+
+  if (url.pathname === "/admin/dedup/links") {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    if (!isAuthorizedAdmin(request, env.ADMIN_API_KEY)) {
+      return unauthorized();
+    }
+
+    return listDedupReviewLinks(request, env, options);
+  }
+
   return notFound();
+}
+
+async function parseSourceModeBody(request: Request): Promise<SourceWrite["mode"] | Response> {
+  try {
+    const body = (await request.json()) as unknown;
+    if (!isRecord(body) || !isSourceMode(body.mode)) {
+      return badRequest("Invalid source operating mode");
+    }
+
+    return body.mode;
+  } catch {
+    return badRequest("Invalid JSON body");
+  }
 }
 
 function sourceRegistryEntryToWrite(source: SourceRegistryEntry): SourceWrite {
@@ -334,6 +387,14 @@ function isAuthorizedAdmin(request: Request, expectedKey: string): boolean {
     return false;
   }
   return constantTimeEqual(providedKey, expectedKey);
+}
+
+function isSourceMode(value: unknown): value is SourceWrite["mode"] {
+  return value === "on" || value === "degraded" || value === "off";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function constantTimeEqual(left: string, right: string): boolean {

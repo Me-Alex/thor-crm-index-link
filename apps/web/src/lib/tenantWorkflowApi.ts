@@ -7,6 +7,19 @@ export const tenantWorkflowAccessTokenStorageKey = "thor_crm_supabase_access_tok
 
 export type TenantWorkflowStatus = "new" | "in_progress" | "contacted" | "ignored" | "archived";
 
+export interface TenantWorkflowTag {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export interface TenantWorkflowNote {
+  id: string;
+  body: string;
+  authorUserId: string;
+  createdAt: string;
+}
+
 export interface TenantWorkflowItem {
   id: string;
   orgId: string;
@@ -18,6 +31,8 @@ export interface TenantWorkflowItem {
   sourceName: string;
   sourceUrl: string;
   updatedAt: string;
+  tags: TenantWorkflowTag[];
+  notes: TenantWorkflowNote[];
 }
 
 export interface FetchTenantWorkflowOptions {
@@ -32,6 +47,11 @@ export interface FetchTenantWorkflowOptions {
 export interface UpdateTenantWorkflowStatusOptions extends FetchTenantWorkflowOptions {
   listingId: string;
   status: TenantWorkflowStatus;
+}
+
+export interface CreateTenantWorkflowNoteOptions extends FetchTenantWorkflowOptions {
+  listingId: string;
+  body: string;
 }
 
 interface TenantListingWorkflowResponse {
@@ -56,6 +76,10 @@ interface TenantListingWorkflowResponse {
   };
 }
 
+interface TenantListingNoteResponse {
+  data: TenantWorkflowNote;
+}
+
 const DEFAULT_TIMEOUT_MS = 5000;
 
 export function buildDemoTenantWorkflow(
@@ -76,7 +100,13 @@ export function buildDemoTenantWorkflow(
       assignee: listing.assignee,
       sourceName: primarySource?.name ?? "Sursa originala",
       sourceUrl: primarySource?.url ?? "#",
-      updatedAt: latestHistoryPoint?.date ?? "demo"
+      updatedAt: latestHistoryPoint?.date ?? "demo",
+      tags: listing.tags.map((tag, index) => ({
+        id: `demo-tag-${listing.id}-${index}`,
+        name: tag,
+        color: "#64748b"
+      })),
+      notes: []
     };
   });
 }
@@ -134,6 +164,31 @@ export async function updateTenantWorkflowStatus(
   return payload;
 }
 
+export async function createTenantWorkflowNote(
+  options: CreateTenantWorkflowNoteOptions
+): Promise<TenantWorkflowNote> {
+  const orgId = options.orgId ?? demoOrgId;
+  if (!options.accessToken) {
+    throw new ListingsApiError("Supabase user access token is not available");
+  }
+
+  const payload = await fetchTenantWorkflowJson(
+    `/api/orgs/${encodeURIComponent(orgId)}/listings/${encodeURIComponent(options.listingId)}/notes`,
+    {
+      ...options,
+      accessToken: options.accessToken,
+      method: "POST",
+      body: JSON.stringify({ body: options.body })
+    }
+  );
+
+  if (!isTenantListingNoteResponse(payload)) {
+    throw new ListingsApiError("Worker tenant workflow API returned an invalid note payload");
+  }
+
+  return payload.data;
+}
+
 export function resolveTenantWorkflowAccessToken(): string | undefined {
   if (typeof window === "undefined") {
     return undefined;
@@ -160,7 +215,7 @@ function workflowStatusFromListing(status: ListingStatus): TenantWorkflowStatus 
 
 async function fetchTenantWorkflowJson(
   path: string,
-  options: FetchTenantWorkflowOptions & { method?: "GET" | "PATCH"; body?: string; accessToken: string }
+  options: FetchTenantWorkflowOptions & { method?: "GET" | "POST" | "PATCH"; body?: string; accessToken: string }
 ): Promise<unknown> {
   const baseUrl = resolveWorkerApiBaseUrl(options.baseUrl);
   if (!baseUrl) {
@@ -220,7 +275,9 @@ function toTenantWorkflowItem(
       assignee: payload.data.state.assigneeUserId ?? listing.assignee,
       sourceName: primarySource?.name ?? "Sursa originala",
       sourceUrl: primarySource?.url ?? "#",
-      updatedAt: payload.data.state.updatedAt ?? payload.data.state.lastSeenByOrgAt ?? "live"
+      updatedAt: payload.data.state.updatedAt ?? payload.data.state.lastSeenByOrgAt ?? "live",
+      tags: payload.data.tags,
+      notes: payload.data.notes
     }
   );
 }
@@ -237,7 +294,32 @@ function isTenantListingWorkflowResponse(payload: unknown): payload is TenantLis
     (state.lastSeenByOrgAt === null || typeof state.lastSeenByOrgAt === "string") &&
     (state.updatedAt === null || typeof state.updatedAt === "string") &&
     Array.isArray(payload.data.tags) &&
-    Array.isArray(payload.data.notes)
+    payload.data.tags.every(isTenantWorkflowTag) &&
+    Array.isArray(payload.data.notes) &&
+    payload.data.notes.every(isTenantWorkflowNote)
+  );
+}
+
+function isTenantListingNoteResponse(payload: unknown): payload is TenantListingNoteResponse {
+  return isRecord(payload) && isTenantWorkflowNote(payload.data);
+}
+
+function isTenantWorkflowTag(value: unknown): value is TenantWorkflowTag {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.name === "string" &&
+    typeof value.color === "string"
+  );
+}
+
+function isTenantWorkflowNote(value: unknown): value is TenantWorkflowNote {
+  return (
+    isRecord(value) &&
+    typeof value.id === "string" &&
+    typeof value.body === "string" &&
+    typeof value.authorUserId === "string" &&
+    typeof value.createdAt === "string"
   );
 }
 

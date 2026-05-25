@@ -62,21 +62,45 @@ describe("SpatialAppShell", () => {
 
   it("keeps workflow status actions available from the inspector", () => {
     const onWorkflowStatusChange = vi.fn();
+    const onWorkflowNoteCreate = vi.fn();
+    const workflowItems = [
+      {
+        ...buildDemoTenantWorkflow(demoListings)[0]!,
+        tags: [{ id: "tag-1", name: "urgent", color: "#ef4444" }],
+        notes: [
+          {
+            id: "note-1",
+            body: "Sunat proprietar, revine maine.",
+            authorUserId: "agent-1",
+            createdAt: "2026-05-25T10:00:00.000Z"
+          }
+        ]
+      }
+    ];
 
     render(
       <SpatialAppShell
         {...buildSpatialShellProps({
-          onWorkflowStatusChange
+          workflowItems,
+          onWorkflowStatusChange,
+          onWorkflowNoteCreate
         })}
       />
     );
 
     fireEvent.click(within(screen.getByTestId("spatial-canvas")).getByRole("button", { name: /Tenant workflow/i }));
     fireEvent.click(screen.getByRole("button", { name: "Contacted" }));
+    fireEvent.change(screen.getByLabelText(/Nota workflow/i), {
+      target: { value: "Verificat link sursa." }
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Adauga nota" }));
 
     expect(screen.getByRole("button", { name: "Adauga nota" })).toBeInTheDocument();
-    expect(screen.getByText(/Note count: 0/i)).toBeInTheDocument();
+    expect(screen.getByText(/urgent/i)).toBeInTheDocument();
+    expect(screen.getByText(/Sunat proprietar/i)).toBeInTheDocument();
+    expect(screen.getByText(/Note count: 1/i)).toBeInTheDocument();
     expect(onWorkflowStatusChange).toHaveBeenCalledWith("cl-apt-titan", "contacted");
+    expect(onWorkflowNoteCreate).toHaveBeenCalledWith("cl-apt-titan", "Verificat link sursa.");
   });
 
   it("renders a mobile node stack in addition to the desktop canvas", () => {
@@ -113,10 +137,13 @@ function buildSpatialShellProps(
     savedSearchName: "",
     savedSearchCriteria: "",
     savedSearchFrequency: "near real-time",
+    savedSearchAlertChannel: "in_app",
+    savedSearchAlertsEnabled: true,
     savedSearchMessage: "Saved searches demo",
     editingSavedSearchId: null,
     onRefreshListings: vi.fn(),
     onWorkflowStatusChange: vi.fn(),
+    onWorkflowNoteCreate: vi.fn(),
     onAuthEmailChange: vi.fn(),
     onAuthPasswordChange: vi.fn(),
     onAuthSubmit: vi.fn(),
@@ -124,6 +151,8 @@ function buildSpatialShellProps(
     onSavedSearchNameChange: vi.fn(),
     onSavedSearchCriteriaChange: vi.fn(),
     onSavedSearchFrequencyChange: vi.fn(),
+    onSavedSearchAlertChannelChange: vi.fn(),
+    onSavedSearchAlertsEnabledChange: vi.fn(),
     onSavedSearchSubmit: vi.fn(),
     onSavedSearchEdit: vi.fn(),
     onSavedSearchDelete: vi.fn(),

@@ -81,7 +81,7 @@ export async function planAndPersistAlertDeliveriesForWorkflowListing(
 ): Promise<number> {
   assertAlertRepositoryConfig(env);
 
-  const alerts = await loadEnabledInAppAlerts(env, options);
+  const alerts = await loadEnabledAlerts(env, options);
   if (alerts.length === 0) {
     return 0;
   }
@@ -92,7 +92,9 @@ export async function planAndPersistAlertDeliveriesForWorkflowListing(
   }
 
   const existingDeliveries = await loadExistingDeliveries(env, listing.canonicalListingId, alerts, options);
-  const alertByTenantAndSearch = new Map(alerts.map((alert) => [`${alert.org_id}:${alert.saved_search_id}`, alert]));
+  const alertByTenantSearchAndChannel = new Map(
+    alerts.map((alert) => [`${alert.org_id}:${alert.saved_search_id}:${alert.channel}`, alert])
+  );
   const tenantIds = [...new Set(alerts.map((alert) => alert.org_id))];
   const writes = tenantIds.flatMap((tenantId) =>
     planAlertDeliveries({
@@ -102,7 +104,7 @@ export async function planAndPersistAlertDeliveriesForWorkflowListing(
       existingDeliveries,
       evaluatedAt
     }).map((candidate) => {
-      const alert = alertByTenantAndSearch.get(`${candidate.tenantId}:${candidate.savedSearchId}`);
+      const alert = alertByTenantSearchAndChannel.get(`${candidate.tenantId}:${candidate.savedSearchId}:${candidate.channel}`);
       if (!alert) {
         throw new Error("alert_delivery_missing_alert_mapping");
       }
@@ -114,6 +116,7 @@ export async function planAndPersistAlertDeliveriesForWorkflowListing(
         status: "pending",
         payload: {
           delivery_key: candidate.deliveryKey,
+          channel: candidate.channel,
           evaluated_at: candidate.evaluatedAt,
           matched_reasons: candidate.matchedReasons
         }
@@ -144,11 +147,10 @@ async function loadWorkflowListing(
   return row ? rowToWorkflowListing(row) : undefined;
 }
 
-async function loadEnabledInAppAlerts(env: Env, options: AlertDeliveryRepositoryOptions): Promise<AlertRow[]> {
+async function loadEnabledAlerts(env: Env, options: AlertDeliveryRepositoryOptions): Promise<AlertRow[]> {
   const url = supabaseRestUrl(env, "alerts");
   url.searchParams.set("select", "id,org_id,saved_search_id,channel,is_enabled");
   url.searchParams.set("is_enabled", "eq.true");
-  url.searchParams.set("channel", "eq.in_app");
 
   return supabaseJson<AlertRow[]>(env, url, { method: "GET" }, options);
 }
@@ -168,13 +170,18 @@ async function loadSavedSearches(
   url.searchParams.set("id", `in.(${savedSearchIds.join(",")})`);
 
   const rows = await supabaseJson<SavedSearchRow[]>(env, url, { method: "GET" }, options);
-  return rows.map((row) => ({
-    savedSearchId: row.id,
-    tenantId: row.org_id,
-    name: row.name,
-    alertsEnabled: true,
-    criteria: row.criteria ?? {}
-  }));
+  return rows.flatMap((row) =>
+    alerts
+      .filter((alert) => alert.org_id === row.org_id && alert.saved_search_id === row.id)
+      .map((alert) => ({
+        savedSearchId: row.id,
+        tenantId: row.org_id,
+        name: row.name,
+        alertsEnabled: true,
+        alertChannel: alert.channel,
+        criteria: row.criteria ?? {}
+      }))
+  );
 }
 
 async function loadExistingDeliveries(
@@ -199,7 +206,8 @@ async function loadExistingDeliveries(
       {
         tenantId: row.org_id,
         savedSearchId: alert.saved_search_id,
-        canonicalListingId: row.canonical_listing_id
+        canonicalListingId: row.canonical_listing_id,
+        channel: alert.channel
       }
     ];
   });

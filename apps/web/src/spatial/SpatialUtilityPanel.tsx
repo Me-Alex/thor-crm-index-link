@@ -11,6 +11,8 @@ interface SpatialUtilityPanelProps {
   savedSearchName: string;
   savedSearchCriteria: string;
   savedSearchFrequency: SavedSearch["frequency"];
+  savedSearchAlertChannel: SavedSearch["alertChannel"];
+  savedSearchAlertsEnabled: boolean;
   savedSearchMessage: string;
   editingSavedSearchId: string | null;
   onAuthEmailChange: (email: string) => void;
@@ -20,6 +22,8 @@ interface SpatialUtilityPanelProps {
   onSavedSearchNameChange: (name: string) => void;
   onSavedSearchCriteriaChange: (criteria: string) => void;
   onSavedSearchFrequencyChange: (frequency: SavedSearch["frequency"]) => void;
+  onSavedSearchAlertChannelChange: (channel: SavedSearch["alertChannel"]) => void;
+  onSavedSearchAlertsEnabledChange: (enabled: boolean) => void;
   onSavedSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSavedSearchEdit: (search: SavedSearch) => void;
   onSavedSearchDelete: (search: SavedSearch) => void;
@@ -35,6 +39,8 @@ export function SpatialUtilityPanel({
   savedSearchName,
   savedSearchCriteria,
   savedSearchFrequency,
+  savedSearchAlertChannel,
+  savedSearchAlertsEnabled,
   savedSearchMessage,
   editingSavedSearchId,
   onAuthEmailChange,
@@ -44,6 +50,8 @@ export function SpatialUtilityPanel({
   onSavedSearchNameChange,
   onSavedSearchCriteriaChange,
   onSavedSearchFrequencyChange,
+  onSavedSearchAlertChannelChange,
+  onSavedSearchAlertsEnabledChange,
   onSavedSearchSubmit,
   onSavedSearchEdit,
   onSavedSearchDelete
@@ -127,6 +135,25 @@ export function SpatialUtilityPanel({
               <option value="daily">daily</option>
             </select>
           </label>
+          <label>
+            <span>Canal alerta</span>
+            <select
+              value={savedSearchAlertChannel}
+              onChange={(event) => onSavedSearchAlertChannelChange(parseSavedSearchAlertChannel(event.target.value))}
+            >
+              <option value="in_app">in-app</option>
+              <option value="email">email</option>
+              <option value="webhook">webhook</option>
+            </select>
+          </label>
+          <label className="utility-check">
+            <input
+              type="checkbox"
+              checked={savedSearchAlertsEnabled}
+              onChange={(event) => onSavedSearchAlertsEnabledChange(event.target.checked)}
+            />
+            <span>Alerte active</span>
+          </label>
           <button type="submit">{editingSavedSearchId ? "Actualizeaza cautare" : "Salveaza cautare"}</button>
         </form>
         <p className="utility-note" role="status" aria-live="polite">
@@ -138,7 +165,7 @@ export function SpatialUtilityPanel({
               <strong>{search.name}</strong>
               <span>{search.criteria}</span>
               <em>
-                {search.matches} match · {search.frequency}
+                {search.matches} match · {search.frequency} · {search.alertChannel} · {search.alertsEnabled ? "on" : "off"}
               </em>
               <div className="utility-actions">
                 <button type="button" aria-label={`Editeaza ${search.name}`} onClick={() => onSavedSearchEdit(search)}>
@@ -158,4 +185,8 @@ export function SpatialUtilityPanel({
 
 function parseSavedSearchFrequency(value: string): SavedSearch["frequency"] {
   return value === "hourly" || value === "daily" ? value : "near real-time";
+}
+
+function parseSavedSearchAlertChannel(value: string): SavedSearch["alertChannel"] {
+  return value === "email" || value === "webhook" ? value : "in_app";
 }
