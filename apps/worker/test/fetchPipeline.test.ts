@@ -9,12 +9,19 @@ describe("handleFetchMessage", () => {
   it("parses a fixture listing and persists a normalized SourceListing", async () => {
     const writes: unknown[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
       writes.push({
-        url: String(input),
+        url,
         method: init?.method,
-        body: JSON.parse(String(init?.body))
+        body: init?.body ? JSON.parse(String(init.body)) : undefined
       });
 
+      if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+        return Response.json([]);
+      }
+      if (url.includes("/rest/v1/canonical_listings")) {
+        return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
+      }
       return new Response(JSON.stringify([{ id: "source-listing-id" }]), {
         status: 201,
         headers: { "content-type": "application/json" }
@@ -33,32 +40,30 @@ describe("handleFetchMessage", () => {
       { fetch: fetchMock }
     );
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-    expect(writes).toEqual([
-      {
-        url: "https://project.supabase.co/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key",
-        method: "POST",
-        body: {
-          source_id: "demo",
-          source_listing_key: "demo-apt-titan",
-          url: "https://example.test/listings/demo-apt-titan",
-          normalized_payload: expect.objectContaining({
-            title: "Apartament 2 camere Titan",
-            priceEur: 89500,
-            areaSqm: 54,
-            rooms: 2,
-            city: "bucuresti",
-            district: "sector 3",
-            neighborhood: "titan"
-          }),
-          content_hash: expect.any(String),
-          crawl_status: "active",
-          last_fetched_at: "2026-05-25T00:00:00.000Z",
-          last_seen_at: "2026-05-25T00:00:00.000Z",
-          parse_error: null
-        }
+    expect(fetchMock).toHaveBeenCalledTimes(5);
+    expect(writes[0]).toEqual({
+      url: "https://project.supabase.co/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key",
+      method: "POST",
+      body: {
+        source_id: "demo",
+        source_listing_key: "demo-apt-titan",
+        url: "https://example.test/listings/demo-apt-titan",
+        normalized_payload: expect.objectContaining({
+          title: "Apartament 2 camere Titan",
+          priceEur: 89500,
+          areaSqm: 54,
+          rooms: 2,
+          city: "bucuresti",
+          district: "sector 3",
+          neighborhood: "titan"
+        }),
+        content_hash: expect.any(String),
+        crawl_status: "active",
+        last_fetched_at: "2026-05-25T00:00:00.000Z",
+        last_seen_at: "2026-05-25T00:00:00.000Z",
+        parse_error: null
       }
-    ]);
+    });
   });
 
   it("fetches approved detail HTML when no fixture is provided", async () => {
@@ -73,7 +78,14 @@ describe("handleFetchMessage", () => {
         return new Response(demoListingFixtureHtml, { status: 200 });
       }
 
-      return new Response(JSON.stringify([{ id: "source-listing-id" }]), { status: 201 });
+      if (String(input).includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+        return Response.json([]);
+      }
+      if (String(input).includes("/rest/v1/canonical_listings")) {
+        return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
+      }
+
+      return Response.json([{ id: "source-listing-id" }], { status: 201 });
     });
 
     await handleFetchMessage(
@@ -89,7 +101,11 @@ describe("handleFetchMessage", () => {
 
     expect(calls).toEqual([
       "https://example.test/listings/demo-apt-titan",
-      "https://project.supabase.co/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key"
+      "https://project.supabase.co/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key",
+      expect.stringContaining("https://project.supabase.co/rest/v1/canonical_listings"),
+      "https://project.supabase.co/rest/v1/canonical_listings",
+      "https://project.supabase.co/rest/v1/canonical_listing_links?on_conflict=source_listing_id",
+      "https://project.supabase.co/rest/v1/listing_history"
     ]);
   });
 
@@ -111,6 +127,142 @@ describe("handleFetchMessage", () => {
     ).rejects.toThrow("source_listing_repository_config_missing");
 
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("creates a canonical listing, source link, and history row when no duplicate candidate exists", async () => {
+    const calls: Array<{ url: string; method?: string; body?: unknown }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: init?.method,
+        body: init?.body ? JSON.parse(String(init.body)) : undefined
+      });
+
+      if (url.includes("/rest/v1/source_listings")) {
+        return Response.json([{ id: "source-listing-id" }], { status: 201 });
+      }
+      if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+        return Response.json([]);
+      }
+      if (url.includes("/rest/v1/canonical_listings")) {
+        return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
+      }
+
+      return Response.json([{ id: "write-ok" }], { status: 201 });
+    });
+
+    await handleFetchMessage(
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: "https://example.test/listings/demo-apt-titan",
+        discoveredAt: "2026-05-25T00:00:00.000Z",
+        fixtureHtml: demoListingFixtureHtml
+      },
+      env(),
+      { fetch: fetchMock }
+    );
+
+    expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+      "/rest/v1/source_listings",
+      "/rest/v1/canonical_listings",
+      "/rest/v1/canonical_listings",
+      "/rest/v1/canonical_listing_links",
+      "/rest/v1/listing_history"
+    ]);
+    expect(calls[2]?.body).toMatchObject({
+      title: "Apartament 2 camere Titan",
+      property_type: "apartment",
+      transaction_type: "sale",
+      price_eur: 89500,
+      area_sqm: 54,
+      city: "bucuresti",
+      status: "active"
+    });
+    expect(calls[3]?.body).toMatchObject({
+      source_listing_id: "source-listing-id",
+      canonical_listing_id: "canonical-listing-id",
+      match_score: 1,
+      match_reasons: ["new_canonical_listing"]
+    });
+    expect(calls[4]?.body).toMatchObject({
+      canonical_listing_id: "canonical-listing-id",
+      source_listing_id: "source-listing-id",
+      price_eur: 89500,
+      availability_status: "active"
+    });
+  });
+
+  it("links a source listing to an existing canonical listing when the match score is conservative", async () => {
+    const calls: Array<{ url: string; method?: string; body?: unknown }> = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      calls.push({
+        url,
+        method: init?.method,
+        body: init?.body ? JSON.parse(String(init.body)) : undefined
+      });
+
+      if (url.includes("/rest/v1/source_listings")) {
+        return Response.json([{ id: "source-listing-id" }], { status: 201 });
+      }
+      if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+        return Response.json([
+          {
+            id: "canonical-existing-id",
+            title: "Apartament decomandat 2 camere Titan",
+            price_eur: 90000,
+            area_sqm: 55,
+            rooms: 2,
+            floor: 4,
+            property_type: "apartment",
+            transaction_type: "sale",
+            city: "bucuresti",
+            district: "sector 3",
+            neighborhood: "titan",
+            description_excerpt: "Etaj intermediar."
+          }
+        ]);
+      }
+
+      return Response.json([{ id: "write-ok" }], { status: 201 });
+    });
+
+    await handleFetchMessage(
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: "https://example.test/listings/demo-apt-titan",
+        discoveredAt: "2026-05-25T00:00:00.000Z",
+        fixtureHtml: demoListingFixtureHtml
+      },
+      env(),
+      { fetch: fetchMock }
+    );
+
+    expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+      "/rest/v1/source_listings",
+      "/rest/v1/canonical_listings",
+      "/rest/v1/canonical_listings",
+      "/rest/v1/canonical_listing_links",
+      "/rest/v1/listing_history"
+    ]);
+    expect(calls[2]).toMatchObject({
+      method: "PATCH",
+      body: {
+        last_seen_at: "2026-05-25T00:00:00.000Z",
+        status: "active"
+      }
+    });
+    expect(calls[3]?.body).toMatchObject({
+      source_listing_id: "source-listing-id",
+      canonical_listing_id: "canonical-existing-id",
+      match_reasons: expect.arrayContaining(["same_location", "price_close", "area_close"])
+    });
+    expect(calls[3]?.body).not.toMatchObject({
+      match_reasons: ["new_canonical_listing"]
+    });
   });
 });
 
@@ -223,7 +375,16 @@ describe("handleDiscoverMessage", () => {
 describe("handleQueueBatch", () => {
   it("acks fetch messages after the fixture pipeline persists them", async () => {
     const originalFetch = globalThis.fetch;
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify([{ id: "source-listing-id" }]), { status: 201 }));
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+        return Response.json([]);
+      }
+      if (url.includes("/rest/v1/canonical_listings")) {
+        return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
+      }
+      return Response.json([{ id: "source-listing-id" }], { status: 201 });
+    });
     const ack = vi.fn();
     const retry = vi.fn();
     globalThis.fetch = fetchMock as typeof fetch;
@@ -252,7 +413,7 @@ describe("handleQueueBatch", () => {
       globalThis.fetch = originalFetch;
     }
 
-    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock).toHaveBeenCalledTimes(5);
     expect(ack).toHaveBeenCalledOnce();
     expect(retry).not.toHaveBeenCalled();
   });

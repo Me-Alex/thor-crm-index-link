@@ -73,3 +73,7 @@ export function badGateway(error: string, message: string): Response {
     { status: 502 }
   );
 }
+
+export function serviceUnavailable(body: unknown): Response {
+  return jsonResponse(body, { status: 503 });
+}

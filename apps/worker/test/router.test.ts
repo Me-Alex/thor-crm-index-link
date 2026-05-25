@@ -19,6 +19,41 @@ describe("handleRequest", () => {
     });
   });
 
+  it("returns ready when Supabase REST is reachable with server-side credentials", async () => {
+    const response = await handleRequest(new Request("https://worker.test/ready"), env(), {
+      fetch: async (input, init) => {
+        expect(String(input)).toBe("https://project.supabase.co/rest/v1/sources?select=id&limit=1");
+        expect(init?.headers).toMatchObject({
+          apikey: "secret",
+          authorization: "Bearer secret"
+        });
+        return Response.json([{ id: "demo" }]);
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    await expect(response.json()).resolves.toEqual({
+      ok: true,
+      service: "thor-crm-index-link-worker",
+      supabase: "reachable"
+    });
+  });
+
+  it("returns not ready when Supabase credentials are missing", async () => {
+    const response = await handleRequest(new Request("https://worker.test/ready"), {
+      ...env(),
+      SUPABASE_SERVICE_ROLE_KEY: ""
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      service: "thor-crm-index-link-worker",
+      supabase: "missing_config"
+    });
+  });
+
   it("allows public read-route CORS preflight without exposing admin routes", async () => {
     const publicResponse = await handleRequest(new Request("https://worker.test/api/listings", { method: "OPTIONS" }), env());
     const adminResponse = await handleRequest(new Request("https://worker.test/admin/ingest/demo", { method: "OPTIONS" }), env());
@@ -78,12 +113,19 @@ describe("handleRequest", () => {
       env(),
       {
         fetch: async (input, init) => {
+          const url = String(input);
           writes.push({
-            url: String(input),
+            url,
             method: init?.method,
-            body: JSON.parse(String(init?.body))
+            body: init?.body ? JSON.parse(String(init.body)) : undefined
           });
-          return new Response(JSON.stringify([{ id: "source-listing-id" }]), { status: 201 });
+          if (url.includes("/rest/v1/canonical_listings") && init?.method === "GET") {
+            return Response.json([]);
+          }
+          if (url.includes("/rest/v1/canonical_listings")) {
+            return Response.json([{ id: "canonical-listing-id" }], { status: 201 });
+          }
+          return Response.json([{ id: "source-listing-id" }], { status: 201 });
         }
       }
     );
@@ -95,7 +137,7 @@ describe("handleRequest", () => {
       url: "https://example.test/listings/demo-apt-titan",
       status: "ingested"
     });
-    expect(writes).toHaveLength(1);
+    expect(writes).toHaveLength(5);
   });
 });
 

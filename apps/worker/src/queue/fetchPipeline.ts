@@ -1,10 +1,11 @@
 import { getAdapter } from "@thor-crm/adapters";
 import { normalizeListingObservation } from "../ingest/normalization";
 import type { Env, FetchMessage } from "../runtime/env";
+import { persistCanonicalMatch, type CanonicalListingRepositoryOptions } from "./canonicalListingRepository";
 import { fetchHtml, type HtmlFetchOptions } from "./httpFetch";
 import { upsertSourceListing, type SourceListingRepositoryOptions } from "./sourceListingRepository";
 
-export interface FetchPipelineOptions extends SourceListingRepositoryOptions, HtmlFetchOptions {}
+export interface FetchPipelineOptions extends SourceListingRepositoryOptions, CanonicalListingRepositoryOptions, HtmlFetchOptions {}
 
 export async function handleFetchMessage(message: FetchMessage, env: Env, options: FetchPipelineOptions = {}): Promise<void> {
   const html = message.fixtureHtml ?? (await fetchHtml(message.url, options));
@@ -20,7 +21,7 @@ export async function handleFetchMessage(message: FetchMessage, env: Env, option
   }
 
   const normalized = normalizeListingObservation(parsed.observation);
-  await upsertSourceListing(
+  const sourceListingId = await upsertSourceListing(
     env,
     {
       source_id: normalized.sourceId,
@@ -35,4 +36,5 @@ export async function handleFetchMessage(message: FetchMessage, env: Env, option
     },
     options
   );
+  await persistCanonicalMatch(env, sourceListingId, normalized, options);
 }

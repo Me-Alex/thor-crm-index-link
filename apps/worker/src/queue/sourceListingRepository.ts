@@ -21,7 +21,7 @@ export async function upsertSourceListing(
   env: Env,
   write: SourceListingWrite,
   options: SourceListingRepositoryOptions = {}
-): Promise<void> {
+): Promise<string> {
   if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
     throw new Error("source_listing_repository_config_missing");
   }
@@ -43,4 +43,11 @@ export async function upsertSourceListing(
     const body = await response.text();
     throw new Error(`source_listing_upsert_failed:${response.status}:${body}`);
   }
+
+  const rows = (await response.json()) as unknown;
+  if (!Array.isArray(rows) || typeof rows[0]?.id !== "string") {
+    throw new Error("source_listing_upsert_missing_id");
+  }
+
+  return rows[0].id;
 }

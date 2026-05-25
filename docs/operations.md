@@ -45,7 +45,7 @@ Reguli:
 - Deploy-ul se face doar după `npm run verify`.
 - Queue handlers trebuie să valideze payload-ul.
 - `429` și `503` reduc frecvența sau pun sursa în `degraded`, nu declanșează retry agresiv.
-- Worker-ul trebuie să expună cel puțin `/health`; `/ready` poate fi adăugat când există dependențe critice runtime.
+- Worker-ul expune `/health` pentru runtime și `/ready` pentru verificarea configurației Supabase + REST connectivity.
 
 ### Demo ingest
 
@@ -78,6 +78,7 @@ Validare minimă după deploy:
 ```bash
 npm run build
 curl -I https://thor-crm-index-link-web.pages.dev
+curl -i https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/ready
 ```
 
 ## GitHub

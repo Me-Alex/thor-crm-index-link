@@ -68,6 +68,6 @@ Această separare previne:
 ## Stare implementare
 
 - `packages/adapters` conține un adapter demo care parsează fixture HTML permis.
-- Worker-ul are un fetch pipeline MVP care normalizează observația și face upsert în `source_listings` prin Supabase REST cu service role server-side.
-- Queue handler-ul procesează mesajele `fetch` pe fixture și nu face requesturi live către portaluri reale.
+- Worker-ul are un fetch pipeline MVP care normalizează observația, face upsert în `source_listings`, caută candidați canonici, creează sau linkuiește `canonical_listings`, scrie `canonical_listing_links` și adaugă `listing_history`.
+- Queue handler-ul procesează mesajele `discover` și `fetch`; demo-ul folosește fixture-uri aprobate și nu face requesturi live către portaluri reale.
 - `POST /admin/ingest/demo` rulează ingestia demo prin același pipeline și este protejat cu `x-admin-api-key`.

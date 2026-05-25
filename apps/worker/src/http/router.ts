@@ -1,7 +1,7 @@
 import { demoListingFixtureHtml } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
 import { handleFetchMessage } from "../queue/fetchPipeline";
-import { jsonResponse, methodNotAllowed, notFound, publicCorsPreflight, unauthorized, withPublicCors } from "./responses";
+import { jsonResponse, methodNotAllowed, notFound, publicCorsPreflight, serviceUnavailable, unauthorized, withPublicCors } from "./responses";
 import type { Env } from "../runtime/env";
 import type { FetchPipelineOptions } from "../queue/fetchPipeline";
 
@@ -11,7 +11,7 @@ const demoFixtureUrl = "https://example.test/listings/demo-apt-titan";
 
 export async function handleRequest(request: Request, env: Env, options: RouterOptions = {}): Promise<Response> {
   const url = new URL(request.url);
-  const isPublicReadRoute = url.pathname === "/health" || url.pathname === "/api/listings" || /^\/api\/listings\/[^/]+$/.test(url.pathname);
+  const isPublicReadRoute = url.pathname === "/health" || url.pathname === "/ready" || url.pathname === "/api/listings" || /^\/api\/listings\/[^/]+$/.test(url.pathname);
 
   if (request.method === "OPTIONS" && isPublicReadRoute) {
     return publicCorsPreflight();
@@ -29,6 +29,14 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
         environment: env.ENVIRONMENT
       })
     );
+  }
+
+  if (url.pathname === "/ready") {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    return withPublicCors(await readyResponse(env, options));
   }
 
   if (url.pathname === "/api/listings") {
@@ -83,6 +91,43 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
   }
 
   return notFound();
+}
+
+async function readyResponse(env: Env, options: RouterOptions): Promise<Response> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    return serviceUnavailable({
+      ok: false,
+      service: "thor-crm-index-link-worker",
+      supabase: "missing_config"
+    });
+  }
+
+  const endpoint = new URL("/rest/v1/sources", env.SUPABASE_URL);
+  endpoint.searchParams.set("select", "id");
+  endpoint.searchParams.set("limit", "1");
+  const fetcher = options.fetch ?? fetch;
+  const response = await fetcher(endpoint.toString(), {
+    method: "GET",
+    headers: {
+      accept: "application/json",
+      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
+    }
+  });
+
+  if (!response.ok) {
+    return serviceUnavailable({
+      ok: false,
+      service: "thor-crm-index-link-worker",
+      supabase: "unreachable"
+    });
+  }
+
+  return jsonResponse({
+    ok: true,
+    service: "thor-crm-index-link-worker",
+    supabase: "reachable"
+  });
 }
 
 function isAuthorizedAdmin(request: Request, expectedKey: string): boolean {
