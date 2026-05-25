@@ -16,7 +16,7 @@ describe("tenant workflow API", () => {
     );
 
     expect(response.status).toBe(204);
-    expect(response.headers.get("access-control-allow-methods")).toBe("GET, POST, PATCH, OPTIONS");
+    expect(response.headers.get("access-control-allow-methods")).toBe("GET, POST, PATCH, DELETE, OPTIONS");
     expect(response.headers.get("access-control-allow-headers")).toContain("authorization");
   });
 
@@ -305,6 +305,219 @@ describe("tenant workflow API", () => {
       ],
       count: 1
     });
+  });
+
+  it("lists saved searches with alert configuration for an org member", async () => {
+    const savedSearchId = "99999999-9999-4999-8999-999999999999";
+    const alertId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: userId }))
+      .mockResolvedValueOnce(Response.json([{ role: "agent" }]))
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            id: savedSearchId,
+            org_id: orgId,
+            name: "Bucuresti apartamente",
+            criteria: { city: "bucuresti", propertyType: "apartment" },
+            created_at: "2026-05-25T10:00:00.000Z",
+            updated_at: "2026-05-25T11:00:00.000Z"
+          }
+        ])
+      )
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            id: alertId,
+            saved_search_id: savedSearchId,
+            channel: "in_app",
+            frequency: "near_real_time",
+            threshold_minutes: 5,
+            is_enabled: true
+          }
+        ])
+      );
+
+    const response = await handleRequest(authorizedRequest(`https://worker.test/api/orgs/${orgId}/saved-searches`), env(), {
+      fetch: fetchMock
+    });
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        {
+          id: savedSearchId,
+          orgId,
+          name: "Bucuresti apartamente",
+          criteria: { city: "bucuresti", propertyType: "apartment" },
+          createdAt: "2026-05-25T10:00:00.000Z",
+          updatedAt: "2026-05-25T11:00:00.000Z",
+          alerts: [
+            {
+              id: alertId,
+              channel: "in_app",
+              frequency: "near_real_time",
+              thresholdMinutes: 5,
+              isEnabled: true
+            }
+          ]
+        }
+      ],
+      count: 1
+    });
+  });
+
+  it("creates saved searches with in-app alert configuration", async () => {
+    const savedSearchId = "99999999-9999-4999-8999-999999999999";
+    const alertId = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa";
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: userId }))
+      .mockResolvedValueOnce(Response.json([{ role: "admin" }]))
+      .mockResolvedValueOnce(
+        Response.json(
+          [
+            {
+              id: savedSearchId,
+              org_id: orgId,
+              name: "Buc sub 120k",
+              criteria: { city: "bucuresti", maxPriceEur: 120000 },
+              created_at: "2026-05-25T10:00:00.000Z",
+              updated_at: "2026-05-25T10:00:00.000Z"
+            }
+          ],
+          { status: 201 }
+        )
+      )
+      .mockResolvedValueOnce(
+        Response.json(
+          [
+            {
+              id: alertId,
+              saved_search_id: savedSearchId,
+              channel: "in_app",
+              frequency: "near_real_time",
+              threshold_minutes: 5,
+              is_enabled: true
+            }
+          ],
+          { status: 201 }
+        )
+      );
+
+    const response = await handleRequest(
+      authorizedRequest(`https://worker.test/api/orgs/${orgId}/saved-searches`, {
+        method: "POST",
+        body: JSON.stringify({
+          name: " Buc  sub 120k ",
+          criteria: { city: "bucuresti", maxPriceEur: 120000 },
+          alert: { channel: "in_app", frequency: "near_real_time", thresholdMinutes: 5, isEnabled: true }
+        })
+      }),
+      env(),
+      { fetch: fetchMock }
+    );
+
+    expect(response.status).toBe(201);
+    await expect(response.json()).resolves.toEqual({
+      data: {
+        id: savedSearchId,
+        orgId,
+        name: "Buc sub 120k",
+        criteria: { city: "bucuresti", maxPriceEur: 120000 },
+        createdAt: "2026-05-25T10:00:00.000Z",
+        updatedAt: "2026-05-25T10:00:00.000Z",
+        alerts: [
+          {
+            id: alertId,
+            channel: "in_app",
+            frequency: "near_real_time",
+            thresholdMinutes: 5,
+            isEnabled: true
+          }
+        ]
+      }
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[2]?.[1]?.body))).toEqual({
+      org_id: orgId,
+      owner_user_id: userId,
+      name: "Buc sub 120k",
+      criteria: { city: "bucuresti", maxPriceEur: 120000 }
+    });
+    expect(JSON.parse(String(fetchMock.mock.calls[3]?.[1]?.body))).toEqual({
+      org_id: orgId,
+      saved_search_id: savedSearchId,
+      channel: "in_app",
+      frequency: "near_real_time",
+      threshold_minutes: 5,
+      is_enabled: true,
+      config: {}
+    });
+  });
+
+  it("updates and deletes saved searches for an org member", async () => {
+    const savedSearchId = "99999999-9999-4999-8999-999999999999";
+    const updateFetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: userId }))
+      .mockResolvedValueOnce(Response.json([{ role: "admin" }]))
+      .mockResolvedValueOnce(
+        Response.json([
+          {
+            id: savedSearchId,
+            org_id: orgId,
+            name: "Bucuresti actualizat",
+            criteria: { city: "bucuresti", maxPriceEur: 130000 },
+            created_at: "2026-05-25T10:00:00.000Z",
+            updated_at: "2026-05-25T12:00:00.000Z"
+          }
+        ])
+      )
+      .mockResolvedValueOnce(Response.json([]));
+
+    const updateResponse = await handleRequest(
+      authorizedRequest(`https://worker.test/api/orgs/${orgId}/saved-searches/${savedSearchId}`, {
+        method: "PATCH",
+        body: JSON.stringify({
+          name: "Bucuresti actualizat",
+          criteria: { city: "bucuresti", maxPriceEur: 130000 }
+        })
+      }),
+      env(),
+      { fetch: updateFetchMock }
+    );
+
+    expect(updateResponse.status).toBe(200);
+    await expect(updateResponse.json()).resolves.toMatchObject({
+      data: {
+        id: savedSearchId,
+        name: "Bucuresti actualizat",
+        criteria: { city: "bucuresti", maxPriceEur: 130000 }
+      }
+    });
+    expect(updateFetchMock.mock.calls[2]?.[1]?.method).toBe("PATCH");
+
+    const deleteFetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(Response.json({ id: userId }))
+      .mockResolvedValueOnce(Response.json([{ role: "admin" }]))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+
+    const deleteResponse = await handleRequest(
+      authorizedRequest(`https://worker.test/api/orgs/${orgId}/saved-searches/${savedSearchId}`, { method: "DELETE" }),
+      env(),
+      { fetch: deleteFetchMock }
+    );
+
+    expect(deleteResponse.status).toBe(200);
+    await expect(deleteResponse.json()).resolves.toEqual({
+      data: {
+        id: savedSearchId,
+        deleted: true
+      }
+    });
+    expect(deleteFetchMock.mock.calls[2]?.[1]?.method).toBe("DELETE");
   });
 });
 

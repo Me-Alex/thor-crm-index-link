@@ -7,6 +7,8 @@ export interface TenantWorkflowApiOptions {
 }
 
 type TenantListingStatus = "new" | "in_progress" | "contacted" | "ignored" | "archived";
+type AlertChannel = "in_app" | "email" | "webhook";
+type AlertFrequency = "near_real_time" | "hourly" | "daily";
 
 interface AuthContext {
   userId: string;
@@ -56,10 +58,42 @@ interface AlertDeliveryRow {
   created_at: string;
 }
 
+interface SavedSearchRow {
+  id: string;
+  org_id: string;
+  name: string;
+  criteria: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+interface SavedSearchAlertRow {
+  id: string;
+  saved_search_id: string;
+  channel: AlertChannel;
+  frequency: AlertFrequency;
+  threshold_minutes: number;
+  is_enabled: boolean;
+}
+
 interface StateUpdateInput {
   status?: TenantListingStatus;
   assigneeUserId?: string | null;
   lastSeenByOrgAt?: string | null;
+}
+
+interface SavedSearchInput {
+  name?: string;
+  criteria?: Record<string, unknown>;
+  alert?: SavedSearchAlertInput;
+}
+
+interface SavedSearchAlertInput {
+  channel: AlertChannel;
+  frequency: AlertFrequency;
+  thresholdMinutes: number;
+  isEnabled: boolean;
+  config: Record<string, unknown>;
 }
 
 class SupabaseApiError extends Error {
@@ -72,6 +106,8 @@ class SupabaseApiError extends Error {
 }
 
 const tenantListingStatuses = new Set<TenantListingStatus>(["new", "in_progress", "contacted", "ignored", "archived"]);
+const alertChannels = new Set<AlertChannel>(["in_app", "email", "webhook"]);
+const alertFrequencies = new Set<AlertFrequency>(["near_real_time", "hourly", "daily"]);
 
 export async function getTenantListingWorkflow(
   request: Request,
@@ -218,6 +254,176 @@ export async function listTenantAlertDeliveries(
   }
 }
 
+export async function listTenantSavedSearches(
+  request: Request,
+  env: Env,
+  orgId: string,
+  options: TenantWorkflowApiOptions = {}
+): Promise<Response> {
+  const auth = await authorizeOrgMember(request, env, orgId, options);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  try {
+    const url = new URL(request.url);
+    const searchRows = await queryRows<SavedSearchRow>(env, options, "saved_searches", {
+      select: "id,org_id,name,criteria,created_at,updated_at",
+      org_id: `eq.${orgId}`,
+      order: "updated_at.desc",
+      limit: String(parseLimit(url.searchParams.get("limit")))
+    });
+    const alertRows = await getAlertsForSavedSearches(env, options, orgId, searchRows);
+
+    return jsonResponse({
+      data: searchRows.map((row) => mapSavedSearch(row, alertRows)),
+      count: searchRows.length
+    });
+  } catch (error) {
+    return supabaseFailureResponse(error);
+  }
+}
+
+export async function createTenantSavedSearch(
+  request: Request,
+  env: Env,
+  orgId: string,
+  options: TenantWorkflowApiOptions = {}
+): Promise<Response> {
+  const parsedBody = await parseSavedSearchBody(request, false);
+  if (parsedBody instanceof Response) {
+    return parsedBody;
+  }
+
+  const auth = await authorizeOrgMember(request, env, orgId, options);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  try {
+    const searchRows = await writeRows<SavedSearchRow>(
+      env,
+      options,
+      "saved_searches",
+      {
+        org_id: orgId,
+        owner_user_id: auth.userId,
+        name: parsedBody.name,
+        criteria: parsedBody.criteria
+      },
+      {},
+      "return=representation"
+    );
+    const savedSearch = mapRequiredSavedSearch(searchRows[0], []);
+    const alertRows = parsedBody.alert
+      ? await writeRows<SavedSearchAlertRow>(
+          env,
+          options,
+          "alerts",
+          {
+            org_id: orgId,
+            saved_search_id: savedSearch.id,
+            channel: parsedBody.alert.channel,
+            frequency: parsedBody.alert.frequency,
+            threshold_minutes: parsedBody.alert.thresholdMinutes,
+            is_enabled: parsedBody.alert.isEnabled,
+            config: parsedBody.alert.config
+          },
+          {},
+          "return=representation"
+        )
+      : [];
+
+    return jsonResponse(
+      {
+        data: mapRequiredSavedSearch(searchRows[0], alertRows)
+      },
+      { status: 201 }
+    );
+  } catch (error) {
+    return supabaseFailureResponse(error);
+  }
+}
+
+export async function updateTenantSavedSearch(
+  request: Request,
+  env: Env,
+  orgId: string,
+  savedSearchId: string,
+  options: TenantWorkflowApiOptions = {}
+): Promise<Response> {
+  const parsedBody = await parseSavedSearchBody(request, true);
+  if (parsedBody instanceof Response) {
+    return parsedBody;
+  }
+
+  const auth = await authorizeOrgMember(request, env, orgId, options);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  const payload: Record<string, unknown> = {};
+  if (parsedBody.name) {
+    payload.name = parsedBody.name;
+  }
+  if (parsedBody.criteria) {
+    payload.criteria = parsedBody.criteria;
+  }
+  if (Object.keys(payload).length === 0) {
+    return badRequest("No supported saved search fields provided");
+  }
+
+  try {
+    const searchRows = await updateRows<SavedSearchRow>(
+      env,
+      options,
+      "saved_searches",
+      payload,
+      {
+        org_id: `eq.${orgId}`,
+        id: `eq.${savedSearchId}`
+      },
+      "return=representation"
+    );
+    const alertRows = await getAlertsForSavedSearches(env, options, orgId, searchRows);
+
+    return jsonResponse({
+      data: mapRequiredSavedSearch(searchRows[0], alertRows)
+    });
+  } catch (error) {
+    return supabaseFailureResponse(error);
+  }
+}
+
+export async function deleteTenantSavedSearch(
+  request: Request,
+  env: Env,
+  orgId: string,
+  savedSearchId: string,
+  options: TenantWorkflowApiOptions = {}
+): Promise<Response> {
+  const auth = await authorizeOrgMember(request, env, orgId, options);
+  if (auth instanceof Response) {
+    return auth;
+  }
+
+  try {
+    await deleteRows(env, options, "saved_searches", {
+      org_id: `eq.${orgId}`,
+      id: `eq.${savedSearchId}`
+    });
+
+    return jsonResponse({
+      data: {
+        id: savedSearchId,
+        deleted: true
+      }
+    });
+  } catch (error) {
+    return supabaseFailureResponse(error);
+  }
+}
+
 async function authorizeOrgMember(
   request: Request,
   env: Env,
@@ -294,6 +500,24 @@ async function getTagsForLinks(
   });
 }
 
+async function getAlertsForSavedSearches(
+  env: Env,
+  options: TenantWorkflowApiOptions,
+  orgId: string,
+  savedSearches: readonly SavedSearchRow[]
+): Promise<SavedSearchAlertRow[]> {
+  const savedSearchIds = savedSearches.map((row) => row.id);
+  if (savedSearchIds.length === 0) {
+    return [];
+  }
+
+  return queryRows<SavedSearchAlertRow>(env, options, "alerts", {
+    select: "id,saved_search_id,channel,frequency,threshold_minutes,is_enabled",
+    org_id: `eq.${orgId}`,
+    saved_search_id: `in.(${savedSearchIds.join(",")})`
+  });
+}
+
 async function upsertTenantListingState(
   env: Env,
   options: TenantWorkflowApiOptions,
@@ -366,6 +590,49 @@ async function writeRows<Row>(
   });
 
   return parseRows<Row>(response);
+}
+
+async function updateRows<Row>(
+  env: Env,
+  options: TenantWorkflowApiOptions,
+  table: string,
+  payload: Record<string, unknown>,
+  params: Record<string, string>,
+  prefer: string
+): Promise<Row[]> {
+  ensureSupabaseConfigured(env);
+  const url = supabaseRestUrl(env, table);
+  setSearchParams(url, params);
+  const response = await fetchWithOptions(options)(url.toString(), {
+    method: "PATCH",
+    headers: {
+      ...serviceHeaders(env),
+      "content-type": "application/json",
+      prefer
+    },
+    body: JSON.stringify(payload)
+  });
+
+  return parseRows<Row>(response);
+}
+
+async function deleteRows(
+  env: Env,
+  options: TenantWorkflowApiOptions,
+  table: string,
+  params: Record<string, string>
+): Promise<void> {
+  ensureSupabaseConfigured(env);
+  const url = supabaseRestUrl(env, table);
+  setSearchParams(url, params);
+  const response = await fetchWithOptions(options)(url.toString(), {
+    method: "DELETE",
+    headers: serviceHeaders(env)
+  });
+
+  if (!response.ok) {
+    throw new SupabaseApiError(response.status, "rest_failed");
+  }
 }
 
 async function parseRows<Row>(response: Response): Promise<Row[]> {
@@ -448,6 +715,85 @@ async function parseNoteBody(request: Request): Promise<{ body: string } | Respo
   return { body: noteBody };
 }
 
+async function parseSavedSearchBody(request: Request, partial: boolean): Promise<SavedSearchInput | Response> {
+  const body = await readJsonObject(request);
+  if (body instanceof Response) {
+    return body;
+  }
+
+  const input: SavedSearchInput = {};
+  if ("name" in body) {
+    const name = typeof body.name === "string" ? normalizeSavedSearchName(body.name) : "";
+    if (!name) {
+      return badRequest("Saved search name is required");
+    }
+    if (name.length > 160) {
+      return badRequest("Saved search name is too long");
+    }
+    input.name = name;
+  } else if (!partial) {
+    return badRequest("Saved search name is required");
+  }
+
+  if ("criteria" in body) {
+    if (!isJsonObject(body.criteria)) {
+      return badRequest("Saved search criteria must be a JSON object");
+    }
+    input.criteria = body.criteria;
+  } else if (!partial) {
+    input.criteria = {};
+  }
+
+  if ("alert" in body) {
+    const alert = parseSavedSearchAlert(body.alert);
+    if (alert instanceof Response) {
+      return alert;
+    }
+    input.alert = alert;
+  }
+
+  return input;
+}
+
+function parseSavedSearchAlert(value: unknown): SavedSearchAlertInput | Response {
+  if (!isRecord(value)) {
+    return badRequest("Saved search alert must be a JSON object");
+  }
+
+  const channel = value.channel ?? "in_app";
+  if (!isAlertChannel(channel)) {
+    return badRequest("Invalid alert channel");
+  }
+
+  const frequency = value.frequency ?? "near_real_time";
+  if (!isAlertFrequency(frequency)) {
+    return badRequest("Invalid alert frequency");
+  }
+
+  const thresholdMinutes = typeof value.thresholdMinutes === "number" ? value.thresholdMinutes : 5;
+  if (!Number.isInteger(thresholdMinutes) || thresholdMinutes < 1 || thresholdMinutes > 1440) {
+    return badRequest("Invalid alert threshold");
+  }
+
+  const isEnabled = typeof value.isEnabled === "boolean" ? value.isEnabled : true;
+  const config = "config" in value ? value.config : {};
+  if (!isJsonObject(config)) {
+    return badRequest("Invalid alert config");
+  }
+
+  return {
+    channel,
+    frequency,
+    thresholdMinutes,
+    isEnabled,
+    config
+  };
+}
+
+function normalizeSavedSearchName(name: string): string {
+  return name.trim().replace(/\s+/g, " ");
+}
+
 async function readJsonObject(request: Request): Promise<Record<string, unknown> | Response> {
   try {
     const body = (await request.json()) as unknown;
@@ -508,6 +854,36 @@ function mapAlertDelivery(row: AlertDeliveryRow) {
   };
 }
 
+function mapSavedSearch(row: SavedSearchRow, alerts: readonly SavedSearchAlertRow[]) {
+  return {
+    id: row.id,
+    orgId: row.org_id,
+    name: row.name,
+    criteria: row.criteria,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    alerts: alerts.filter((alert) => alert.saved_search_id === row.id).map(mapSavedSearchAlert)
+  };
+}
+
+function mapRequiredSavedSearch(row: SavedSearchRow | undefined, alerts: readonly SavedSearchAlertRow[]) {
+  if (!row) {
+    throw new SupabaseApiError(502, "invalid_response");
+  }
+
+  return mapSavedSearch(row, alerts);
+}
+
+function mapSavedSearchAlert(row: SavedSearchAlertRow) {
+  return {
+    id: row.id,
+    channel: row.channel,
+    frequency: row.frequency,
+    thresholdMinutes: row.threshold_minutes,
+    isEnabled: row.is_enabled
+  };
+}
+
 function setSearchParams(url: URL, params: Record<string, string>): void {
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value));
 }
@@ -552,6 +928,18 @@ function isTenantListingStatus(value: unknown): value is TenantListingStatus {
   return typeof value === "string" && tenantListingStatuses.has(value as TenantListingStatus);
 }
 
+function isAlertChannel(value: unknown): value is AlertChannel {
+  return typeof value === "string" && alertChannels.has(value as AlertChannel);
+}
+
+function isAlertFrequency(value: unknown): value is AlertFrequency {
+  return typeof value === "string" && alertFrequencies.has(value as AlertFrequency);
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isJsonObject(value: unknown): value is Record<string, unknown> {
+  return isRecord(value);
 }

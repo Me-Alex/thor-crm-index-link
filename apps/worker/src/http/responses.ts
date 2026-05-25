@@ -37,7 +37,7 @@ export function publicCorsPreflight(): Response {
 export function withApiCors(response: Response): Response {
   const headers = new Headers(response.headers);
   headers.set("access-control-allow-origin", "*");
-  headers.set("access-control-allow-methods", "GET, POST, PATCH, OPTIONS");
+  headers.set("access-control-allow-methods", "GET, POST, PATCH, DELETE, OPTIONS");
   headers.set("access-control-allow-headers", "authorization, content-type");
   headers.set("vary", "Origin");
 
@@ -53,7 +53,7 @@ export function apiCorsPreflight(): Response {
     status: 204,
     headers: {
       "access-control-allow-origin": "*",
-      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+      "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
       "access-control-allow-headers": "authorization, content-type",
       vary: "Origin"
     }

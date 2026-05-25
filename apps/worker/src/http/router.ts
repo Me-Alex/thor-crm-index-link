@@ -2,7 +2,16 @@ import { demoListingFixtureHtml, sourceRegistry } from "@thor-crm/adapters";
 import type { SourceRegistryEntry } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
 import { listSourceHealth } from "../api/sourceHealth";
-import { createTenantListingNote, getTenantListingWorkflow, listTenantAlertDeliveries, updateTenantListingState } from "../api/tenantWorkflow";
+import {
+  createTenantListingNote,
+  createTenantSavedSearch,
+  deleteTenantSavedSearch,
+  getTenantListingWorkflow,
+  listTenantAlertDeliveries,
+  listTenantSavedSearches,
+  updateTenantListingState,
+  updateTenantSavedSearch
+} from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
 import { upsertSource, type SourceWrite } from "../queue/sourceRepository";
 import { supabaseServiceHeaders } from "../runtime/supabaseRest";
@@ -36,6 +45,8 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/workflow$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/state$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/notes$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/saved-searches$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/saved-searches\/[^/]+$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/alerts$/.test(url.pathname);
 
   if (request.method === "OPTIONS" && isPublicReadRoute) {
@@ -156,6 +167,48 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     }
 
     return withApiCors(await listTenantAlertDeliveries(request, env, decodeURIComponent(tenantAlertsMatch[1] ?? ""), options));
+  }
+
+  const tenantSavedSearchesMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/saved-searches$/);
+  if (tenantSavedSearchesMatch) {
+    if (request.method === "GET") {
+      return withApiCors(await listTenantSavedSearches(request, env, decodeURIComponent(tenantSavedSearchesMatch[1] ?? ""), options));
+    }
+
+    if (request.method === "POST") {
+      return withApiCors(await createTenantSavedSearch(request, env, decodeURIComponent(tenantSavedSearchesMatch[1] ?? ""), options));
+    }
+
+    return withApiCors(methodNotAllowed());
+  }
+
+  const tenantSavedSearchMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/saved-searches\/([^/]+)$/);
+  if (tenantSavedSearchMatch) {
+    if (request.method === "PATCH") {
+      return withApiCors(
+        await updateTenantSavedSearch(
+          request,
+          env,
+          decodeURIComponent(tenantSavedSearchMatch[1] ?? ""),
+          decodeURIComponent(tenantSavedSearchMatch[2] ?? ""),
+          options
+        )
+      );
+    }
+
+    if (request.method === "DELETE") {
+      return withApiCors(
+        await deleteTenantSavedSearch(
+          request,
+          env,
+          decodeURIComponent(tenantSavedSearchMatch[1] ?? ""),
+          decodeURIComponent(tenantSavedSearchMatch[2] ?? ""),
+          options
+        )
+      );
+    }
+
+    return withApiCors(methodNotAllowed());
   }
 
   if (url.pathname === "/admin/ingest/demo") {

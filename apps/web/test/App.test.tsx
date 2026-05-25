@@ -307,6 +307,33 @@ describe("App", () => {
     await waitFor(() => expect(screen.queryByText("Apartament 2 camere Titan")).not.toBeInTheDocument());
   });
 
+  it("creates, edits, and deletes saved searches from the dashboard", async () => {
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/Nume cautare/i), {
+      target: { value: "Garsoniere Brasov" }
+    });
+    fireEvent.change(screen.getByLabelText(/Criterii cautare/i), {
+      target: { value: "rent apartment Brasov max 450 EUR" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Salveaza cautare/i }));
+
+    expect(screen.getByText("Garsoniere Brasov")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Editeaza Garsoniere Brasov/i }));
+    fireEvent.change(screen.getByLabelText(/Nume cautare/i), {
+      target: { value: "Garsoniere Brasov actualizat" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Actualizeaza cautare/i }));
+
+    expect(screen.getByText("Garsoniere Brasov actualizat")).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /Sterge Garsoniere Brasov actualizat/i }));
+
+    expect(screen.queryByText("Garsoniere Brasov actualizat")).not.toBeInTheDocument();
+    expect(screen.getByText(/Cautare stearsa/i)).toBeInTheDocument();
+  });
+
   it("renders live source health cards when the Worker API returns operational metrics", async () => {
     vi.stubEnv("VITE_WORKER_API_URL", "https://worker.example.dev");
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
