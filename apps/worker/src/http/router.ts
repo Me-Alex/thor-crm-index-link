@@ -1,6 +1,7 @@
 import { demoListingFixtureHtml, sourceRegistry } from "@thor-crm/adapters";
 import type { SourceRegistryEntry } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
+import { listSourceHealth } from "../api/sourceHealth";
 import { createTenantListingNote, getTenantListingWorkflow, listTenantAlertDeliveries, updateTenantListingState } from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
 import { upsertSource, type SourceWrite } from "../queue/sourceRepository";
@@ -25,7 +26,12 @@ const demoFixtureUrl = "https://example.test/listings/demo-apt-titan";
 
 export async function handleRequest(request: Request, env: Env, options: RouterOptions = {}): Promise<Response> {
   const url = new URL(request.url);
-  const isPublicReadRoute = url.pathname === "/health" || url.pathname === "/ready" || url.pathname === "/api/listings" || /^\/api\/listings\/[^/]+$/.test(url.pathname);
+  const isPublicReadRoute =
+    url.pathname === "/health" ||
+    url.pathname === "/ready" ||
+    url.pathname === "/api/listings" ||
+    url.pathname === "/api/source-health" ||
+    /^\/api\/listings\/[^/]+$/.test(url.pathname);
   const isTenantApiRoute =
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/workflow$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/state$/.test(url.pathname) ||
@@ -68,6 +74,14 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     }
 
     return withPublicCors(await listListings(request, env, options));
+  }
+
+  if (url.pathname === "/api/source-health") {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    return withPublicCors(await listSourceHealth(env, options));
   }
 
   const listingDetailMatch = url.pathname.match(/^\/api\/listings\/([^/]+)$/);
