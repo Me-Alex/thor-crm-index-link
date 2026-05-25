@@ -4,13 +4,17 @@ Date: 2026-05-25
 
 ## Scope implemented
 
-This slice adds saved search matching, in-app alert planning, and Worker-side persistence into `alert_deliveries`. It does not add auth UI, real email/webhook delivery, or external crawler behavior.
+This slice adds saved search matching, in-app alert planning, Worker-side persistence into `alert_deliveries`, authenticated tenant workflow endpoints, and a guarded frontend workflow surface. It does not add real email/webhook delivery, full Supabase Auth UI, or external crawler behavior.
 
 Ownership stayed inside:
 
 - `apps/worker/src/workflow/*`
 - `apps/worker/src/queue/fetchPipeline.ts`
+- `apps/worker/src/api/tenantWorkflow.ts`
+- `apps/web/src/lib/tenantWorkflowApi.ts`
 - `apps/worker/test/workflowAlerts.test.ts`
+- `apps/worker/test/tenantWorkflowApi.test.ts`
+- `apps/web/test/tenantWorkflowApi.test.ts`
 - `docs/workflow-next-slice.md`
 
 ## API contract
@@ -57,23 +61,39 @@ Behavior:
 - Skips existing deliveries for the same tenant/search/listing.
 - Inserts pending `alert_deliveries` with matched reasons in payload.
 
+### Authenticated tenant workflow endpoints
+
+Endpoints:
+
+- `GET /api/orgs/:orgId/listings/:canonicalListingId/workflow`
+- `PATCH /api/orgs/:orgId/listings/:canonicalListingId/state`
+- `POST /api/orgs/:orgId/listings/:canonicalListingId/notes`
+- `GET /api/orgs/:orgId/alerts`
+
+Behavior:
+
+- Require `Authorization: Bearer <Supabase user access token>`.
+- Validate the user through Supabase Auth and then verify `organization_members` before any tenant read/write.
+- Use `SUPABASE_SERVICE_ROLE_KEY` only inside the Worker.
+- Return CORS headers for authenticated API calls without exposing admin ingest routes.
+- Keep unauthenticated frontend users on demo fallback.
+
 ## Next integration step
 
-[@github](plugin://github@openai-curated) Task: expose tenant workflow and alert history through authenticated API/UI.
+[@github](plugin://github@openai-curated) Task: add full Supabase Auth UI and saved-search management UI.
 
 Constraints:
 
 - Follow `AGENTS.md`.
-- Do not edit `apps/web`.
 - Do not send email or webhooks.
 - Keep Supabase repository code behind Worker/server boundaries.
 - Keep service role usage out of frontend code.
 
 Suggested behavior:
 
-1. Add authenticated tenant API endpoints for listing state, tags, notes, saved searches, and alert history.
-2. Wire the frontend to those endpoints behind Supabase Auth.
-3. Keep public demo fallback for unauthenticated users.
+1. Add login/session handling with Supabase user tokens.
+2. Expose saved-search CRUD behind `/api/orgs/:orgId/saved-searches`.
+3. Replace the temporary `sessionStorage` token bridge with a real auth session provider.
 4. Add tests with fake repositories; no real Supabase calls in tests.
 
 ## Verification target
@@ -82,6 +102,8 @@ Required before PR:
 
 ```powershell
 npm.cmd run test --workspace @thor-crm/worker -- workflowAlerts.test.ts
+npm.cmd run test --workspace @thor-crm/worker -- tenantWorkflowApi.test.ts
+npm.cmd run test --workspace @thor-crm/web -- tenantWorkflowApi.test.ts App.test.tsx
 npm.cmd run typecheck --workspace @thor-crm/worker
 npm.cmd run build
 ```

@@ -1,7 +1,18 @@
 import { demoListingFixtureHtml } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
+import { createTenantListingNote, getTenantListingWorkflow, listTenantAlertDeliveries, updateTenantListingState } from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
-import { jsonResponse, methodNotAllowed, notFound, publicCorsPreflight, serviceUnavailable, unauthorized, withPublicCors } from "./responses";
+import {
+  apiCorsPreflight,
+  jsonResponse,
+  methodNotAllowed,
+  notFound,
+  publicCorsPreflight,
+  serviceUnavailable,
+  unauthorized,
+  withApiCors,
+  withPublicCors
+} from "./responses";
 import type { Env } from "../runtime/env";
 import type { FetchPipelineOptions } from "../queue/fetchPipeline";
 
@@ -12,9 +23,18 @@ const demoFixtureUrl = "https://example.test/listings/demo-apt-titan";
 export async function handleRequest(request: Request, env: Env, options: RouterOptions = {}): Promise<Response> {
   const url = new URL(request.url);
   const isPublicReadRoute = url.pathname === "/health" || url.pathname === "/ready" || url.pathname === "/api/listings" || /^\/api\/listings\/[^/]+$/.test(url.pathname);
+  const isTenantApiRoute =
+    /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/workflow$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/state$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/notes$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/alerts$/.test(url.pathname);
 
   if (request.method === "OPTIONS" && isPublicReadRoute) {
     return publicCorsPreflight();
+  }
+
+  if (request.method === "OPTIONS" && isTenantApiRoute) {
+    return apiCorsPreflight();
   }
 
   if (url.pathname === "/health") {
@@ -59,6 +79,66 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     }
 
     return withPublicCors(await getListingById(decodeURIComponent(listingId), env, options));
+  }
+
+  const tenantWorkflowMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/listings\/([^/]+)\/workflow$/);
+  if (tenantWorkflowMatch) {
+    if (request.method !== "GET") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(
+      await getTenantListingWorkflow(
+        request,
+        env,
+        decodeURIComponent(tenantWorkflowMatch[1] ?? ""),
+        decodeURIComponent(tenantWorkflowMatch[2] ?? ""),
+        options
+      )
+    );
+  }
+
+  const tenantStateMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/listings\/([^/]+)\/state$/);
+  if (tenantStateMatch) {
+    if (request.method !== "PATCH") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(
+      await updateTenantListingState(
+        request,
+        env,
+        decodeURIComponent(tenantStateMatch[1] ?? ""),
+        decodeURIComponent(tenantStateMatch[2] ?? ""),
+        options
+      )
+    );
+  }
+
+  const tenantNoteMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/listings\/([^/]+)\/notes$/);
+  if (tenantNoteMatch) {
+    if (request.method !== "POST") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(
+      await createTenantListingNote(
+        request,
+        env,
+        decodeURIComponent(tenantNoteMatch[1] ?? ""),
+        decodeURIComponent(tenantNoteMatch[2] ?? ""),
+        options
+      )
+    );
+  }
+
+  const tenantAlertsMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/alerts$/);
+  if (tenantAlertsMatch) {
+    if (request.method !== "GET") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(await listTenantAlertDeliveries(request, env, decodeURIComponent(tenantAlertsMatch[1] ?? ""), options));
   }
 
   if (url.pathname === "/admin/ingest/demo") {

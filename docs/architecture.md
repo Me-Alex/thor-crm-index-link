@@ -10,6 +10,26 @@ Data: 2026-05-25
 
 Ingestia rulează server-side în Cloudflare Worker cu service role. UI/API client folosește Supabase Auth + RLS pentru izolarea tenant.
 
+## API and data access boundary
+
+Public index reads stay separate from tenant workflow writes:
+
+- `GET /health`, `GET /ready`, `GET /api/listings` and `GET /api/listings/:id` are public read endpoints for runtime, readiness and index browsing.
+- `POST /admin/ingest/demo` is an operational fixture ingest endpoint protected by `x-admin-api-key`; it must not crawl real portals.
+- Tenant workflow endpoints are authenticated Worker endpoints under `/api/orgs/:orgId/...`; callers send a Supabase user access token and the Worker must verify membership in `organization_members` before returning or mutating tenant data.
+- Supabase REST access that requires elevated permissions is backend-only and uses the Cloudflare Worker `SUPABASE_SERVICE_ROLE_KEY`; browser code must never receive or proxy that key.
+- The service role is a transport credential for trusted backend repositories, not a replacement for tenant authorization checks.
+
+Authenticated tenant workflow endpoint contract:
+
+- `GET /api/orgs/:orgId/listings/:canonicalListingId/workflow` for the aggregate tenant listing state, assigned tags and notes.
+- `PATCH /api/orgs/:orgId/listings/:canonicalListingId/state` for status and assignment in `tenant_listing_states`.
+- `POST /api/orgs/:orgId/listings/:canonicalListingId/notes` for tenant-scoped note creation.
+- `GET /api/orgs/:orgId/alerts` for in-app alert history from `alert_deliveries`.
+- Saved search management should stay under `/api/orgs/:orgId/saved-searches` when exposed; alert planning already reads `saved_searches` server-side during ingest.
+
+All workflow responses are scoped to one `orgId`. Cross-tenant IDs should return no data or an authorization error; prefer false negatives over exposing another tenant's workflow.
+
 ## Pipeline
 
 ```text

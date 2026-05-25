@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   alertDeliveries,
   demoListings,
@@ -13,6 +13,16 @@ import {
 } from "./data/demoData";
 import { filterListings, summarizeListings, type ListingFilters } from "./lib/filterListings";
 import { fetchWorkerListings, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
+import {
+  buildDemoTenantWorkflow,
+  demoOrgId,
+  demoTenantId,
+  fetchTenantWorkflow,
+  resolveTenantWorkflowAccessToken,
+  updateTenantWorkflowStatus,
+  type TenantWorkflowItem,
+  type TenantWorkflowStatus
+} from "./lib/tenantWorkflowApi";
 
 const formatEuro = new Intl.NumberFormat("ro-RO", {
   style: "currency",
@@ -33,15 +43,37 @@ const transactionLabels: Record<TransactionType, string> = {
   rent: "Inchiriere"
 };
 
+const workflowStatusLabels: Record<TenantWorkflowStatus, string> = {
+  new: "Nou",
+  in_progress: "In lucru",
+  contacted: "Contactat",
+  ignored: "Ignorat",
+  archived: "Arhivat"
+};
+
 function App() {
   const [filters, setFilters] = useState<ListingFilters>({});
   const [listings, setListings] = useState<DemoListing[]>(demoListings);
   const [dataMode, setDataMode] = useState<"fallback" | "live">("fallback");
   const [dataMessage, setDataMessage] = useState("Se incearca incarcarea din Worker API.");
   const [isLoadingListings, setIsLoadingListings] = useState(false);
+  const [workflowItems, setWorkflowItems] = useState<TenantWorkflowItem[]>(() =>
+    buildDemoTenantWorkflow(demoListings, demoTenantId)
+  );
+  const [workflowMode, setWorkflowMode] = useState<"demo" | "live">("demo");
+  const [workflowMessage, setWorkflowMessage] = useState("Workflow demo: se folosesc listingurile indexate local.");
+  const [workflowActionMessage, setWorkflowActionMessage] = useState("");
+  const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(false);
+  const workflowStatusOverrides = useRef(new Map<string, TenantWorkflowStatus>());
   const filteredListings = useMemo(() => filterListings(listings, filters), [filters, listings]);
   const summary = useMemo(() => summarizeListings(listings), [listings]);
+  const workflowSummary = useMemo(() => summarizeWorkflow(workflowItems), [workflowItems]);
   const selectedListing = filteredListings[0] ?? listings[0];
+  const applyWorkflowOverrides = (items: TenantWorkflowItem[]) =>
+    items.map((item) => {
+      const status = workflowStatusOverrides.current.get(item.listingId);
+      return status ? { ...item, status } : item;
+    });
 
   useEffect(() => {
     let ignoreResult = false;
@@ -82,6 +114,103 @@ function App() {
     };
   }, []);
 
+  useEffect(() => {
+    let ignoreResult = false;
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = resolveTenantWorkflowAccessToken();
+    const fallbackWorkflow = buildDemoTenantWorkflow(listings, demoTenantId);
+
+    setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
+
+    if (!workerApiBaseUrl) {
+      setWorkflowMode("demo");
+      setWorkflowMessage("Workflow demo: endpointul backend nu este configurat.");
+      return undefined;
+    }
+
+    if (!accessToken) {
+      setWorkflowMode("demo");
+      setWorkflowMessage("Workflow demo: lipseste tokenul Supabase de utilizator pentru endpointurile tenant.");
+      return undefined;
+    }
+
+    setIsLoadingWorkflow(true);
+    fetchTenantWorkflow({ baseUrl: workerApiBaseUrl, orgId: demoOrgId, listings, accessToken })
+      .then((apiWorkflowItems) => {
+        if (ignoreResult) {
+          return;
+        }
+
+        if (apiWorkflowItems.length === 0) {
+          setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
+          setWorkflowMode("demo");
+          setWorkflowMessage("Workflow demo: endpointul backend a raspuns fara date.");
+          return;
+        }
+
+        setWorkflowItems(applyWorkflowOverrides(apiWorkflowItems));
+        setWorkflowMode("live");
+        setWorkflowMessage("Workflow live: statusuri per tenant incarcate din backend.");
+      })
+      .catch((error: unknown) => {
+        if (ignoreResult) {
+          return;
+        }
+
+        setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
+        setWorkflowMode("demo");
+        setWorkflowMessage(
+          `Workflow demo: ${error instanceof Error ? error.message : "endpoint workflow indisponibil"}.`
+        );
+      })
+      .finally(() => {
+        if (!ignoreResult) {
+          setIsLoadingWorkflow(false);
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, [listings]);
+
+  const handleWorkflowStatusChange = async (item: TenantWorkflowItem, status: TenantWorkflowStatus) => {
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = resolveTenantWorkflowAccessToken();
+    workflowStatusOverrides.current.set(item.listingId, status);
+    setWorkflowItems((currentItems) =>
+      currentItems.map((currentItem) =>
+        currentItem.listingId === item.listingId
+          ? { ...currentItem, status, updatedAt: new Date().toISOString() }
+          : currentItem
+      )
+    );
+    setWorkflowActionMessage("Se actualizeaza workflow-ul tenantului.");
+
+    if (!workerApiBaseUrl) {
+      setWorkflowActionMessage("Salvat local: endpointul backend pentru workflow nu este configurat.");
+      return;
+    }
+
+    if (!accessToken) {
+      setWorkflowActionMessage("Salvat local: lipseste tokenul Supabase de utilizator pentru workflow tenant.");
+      return;
+    }
+
+    try {
+      await updateTenantWorkflowStatus({
+        baseUrl: workerApiBaseUrl,
+        orgId: item.orgId,
+        listingId: item.listingId,
+        status,
+        accessToken
+      });
+      setWorkflowActionMessage("Workflow salvat in backend.");
+    } catch {
+      setWorkflowActionMessage("Salvat local: endpointul backend pentru workflow nu este disponibil.");
+    }
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Navigatie produs">
@@ -89,6 +218,7 @@ function App() {
         <nav>
           <a href="#search">Search</a>
           <a href="#detail">Detail</a>
+          <a href="#workflow">Workflow</a>
           <a href="#saved">Saved</a>
           <a href="#alerts">Alerts</a>
           <a href="#health">Health</a>
@@ -267,6 +397,34 @@ function App() {
             )}
           </section>
 
+          <section id="workflow" className="panel" data-testid="tenant-workflow">
+            <div className="section-heading compact">
+              <div>
+                <h2>Tenant Workflow</h2>
+                <p>Pastreaza statusuri per tenant peste index + link.</p>
+              </div>
+              <span className="count-pill">{isLoadingWorkflow ? "Se incarca" : workflowMode === "live" ? "Workflow live" : "Workflow demo"}</span>
+            </div>
+            <p className="tenant-note">
+              Org <strong>{demoTenantId}</strong> are {workflowSummary.active} active si {workflowSummary.contacted} contactate.
+            </p>
+            <div className="workflow-list">
+              {workflowItems.slice(0, 3).map((item) => (
+                <TenantWorkflowCard
+                  key={item.id}
+                  item={item}
+                  onStatusChange={handleWorkflowStatusChange}
+                />
+              ))}
+            </div>
+            <p className="safe-note" role="status" aria-live="polite">
+              {workflowActionMessage || workflowMessage}
+            </p>
+            <p className="safe-note">
+              UI-ul nu re-hosteaza continut portal: afiseaza titlu, status tenant si link catre sursa originala.
+            </p>
+          </section>
+
           <section id="saved" className="panel">
             <h2>Saved Searches</h2>
             <div className="stack-list">
@@ -345,6 +503,44 @@ function ListingRow({ listing }: { listing: DemoListing }) {
   );
 }
 
+function TenantWorkflowCard({
+  item,
+  onStatusChange
+}: {
+  item: TenantWorkflowItem;
+  onStatusChange: (item: TenantWorkflowItem, status: TenantWorkflowStatus) => void;
+}) {
+  return (
+    <article className="workflow-card" aria-label={`Workflow ${item.title}`}>
+      <div className="workflow-card-heading">
+        <strong>{item.title}</strong>
+        <span>Status: {workflowStatusLabels[item.status]}</span>
+      </div>
+      <div className="workflow-meta">
+        <span>Agent: {item.assignee}</span>
+        <a href={item.sourceUrl} target="_blank" rel="noreferrer">
+          {item.sourceName}
+        </a>
+      </div>
+      <div className="workflow-actions">
+        <button type="button" onClick={() => onStatusChange(item, "in_progress")}>
+          Preia
+        </button>
+        <button
+          type="button"
+          aria-label={`Marcheaza contactat pentru ${item.title}`}
+          onClick={() => onStatusChange(item, "contacted")}
+        >
+          Contactat
+        </button>
+        <button type="button" onClick={() => onStatusChange(item, "ignored")}>
+          Ignora
+        </button>
+      </div>
+    </article>
+  );
+}
+
 function Metric({ label, value }: { label: string; value: string }) {
   return (
     <div className="metric">
@@ -374,6 +570,16 @@ function parsePropertyType(value: string): PropertyType | undefined {
 function omitFilter<Key extends keyof ListingFilters>(filters: ListingFilters, key: Key): ListingFilters {
   const { [key]: _removed, ...rest } = filters;
   return rest;
+}
+
+function summarizeWorkflow(items: TenantWorkflowItem[]) {
+  return items.reduce(
+    (summary, item) => ({
+      active: item.status === "ignored" || item.status === "archived" ? summary.active : summary.active + 1,
+      contacted: item.status === "contacted" ? summary.contacted + 1 : summary.contacted
+    }),
+    { active: 0, contacted: 0 }
+  );
 }
 
 export default App;

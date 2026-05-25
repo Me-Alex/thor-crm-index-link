@@ -34,6 +34,32 @@ export function publicCorsPreflight(): Response {
   });
 }
 
+export function withApiCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", "*");
+  headers.set("access-control-allow-methods", "GET, POST, PATCH, OPTIONS");
+  headers.set("access-control-allow-headers", "authorization, content-type");
+  headers.set("vary", "Origin");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+export function apiCorsPreflight(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+      "access-control-allow-headers": "authorization, content-type",
+      vary: "Origin"
+    }
+  });
+}
+
 export function notFound(): Response {
   return jsonResponse(
     {
@@ -54,13 +80,33 @@ export function methodNotAllowed(): Response {
   );
 }
 
-export function unauthorized(): Response {
+export function badRequest(message: string): Response {
+  return jsonResponse(
+    {
+      error: "bad_request",
+      message
+    },
+    { status: 400 }
+  );
+}
+
+export function unauthorized(message = "Invalid admin API key"): Response {
   return jsonResponse(
     {
       error: "unauthorized",
-      message: "Invalid admin API key"
+      message
     },
     { status: 401 }
+  );
+}
+
+export function forbidden(message: string): Response {
+  return jsonResponse(
+    {
+      error: "forbidden",
+      message
+    },
+    { status: 403 }
   );
 }
 
