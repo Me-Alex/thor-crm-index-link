@@ -4,7 +4,7 @@ Data: 2026-05-25
 
 ## Supabase
 
-Deploy-ul public curent folosește proiectul existent `habitat-crm-romania` (`mrnltzamrhgrgslmjzvu`). Încercarea de a crea proiectul nou `thor-crm-index-link` a fost blocată de limita Supabase free de 2 proiecte active.
+Deploy-ul public curent folosește proiectul dedicat `thor-crm-index-link` (`mqzchppokgaoacgkqkzh`). Proiectul vechi `habitat-crm-romania` (`mrnltzamrhgrgslmjzvu`) a fost pus în pauză pentru a elibera limita Supabase free.
 
 ```bash
 npx supabase@latest link --project-ref <project-ref>

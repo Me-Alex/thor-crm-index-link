@@ -5,7 +5,7 @@ Proiect: Thor CRM Index + Link
 Repo: <https://github.com/Me-Alex/thor-crm-index-link>  
 Cloudflare Pages: <https://thor-crm-index-link-web.pages.dev>  
 Worker health: <https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health>  
-Supabase project: <https://supabase.com/dashboard/project/mrnltzamrhgrgslmjzvu>
+Supabase project: <https://supabase.com/dashboard/project/mqzchppokgaoacgkqkzh>
 
 ## 1. Scop
 
@@ -766,4 +766,4 @@ MVP-ul poate fi considerat livrabil când:
 - GitHub repo proiect: <https://github.com/Me-Alex/thor-crm-index-link>
 - Cloudflare Pages public: <https://thor-crm-index-link-web.pages.dev>
 - Cloudflare Worker health: <https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health>
-- Supabase project: <https://supabase.com/dashboard/project/mrnltzamrhgrgslmjzvu>
+- Supabase project: <https://supabase.com/dashboard/project/mqzchppokgaoacgkqkzh>

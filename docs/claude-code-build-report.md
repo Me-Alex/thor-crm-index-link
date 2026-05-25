@@ -412,4 +412,4 @@ Scrie teste pentru cazuri match, no-match și scor sub prag.
 - GitHub repo proiect: <https://github.com/Me-Alex/thor-crm-index-link>
 - Cloudflare Pages public: <https://thor-crm-index-link-web.pages.dev>
 - Cloudflare Worker health: <https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health>
-- Supabase project: <https://supabase.com/dashboard/project/mrnltzamrhgrgslmjzvu>
+- Supabase project: <https://supabase.com/dashboard/project/mqzchppokgaoacgkqkzh>

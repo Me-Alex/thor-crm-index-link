@@ -7,7 +7,7 @@ Monorepo MVP pentru un CRM/SaaS multi-tenant destinat agențiilor imobiliare din
 - Aplicație web: <https://thor-crm-index-link-web.pages.dev>
 - Worker health: <https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health>
 - Repository: <https://github.com/Me-Alex/thor-crm-index-link>
-- Supabase project: <https://supabase.com/dashboard/project/mrnltzamrhgrgslmjzvu>
+- Supabase project: <https://supabase.com/dashboard/project/mqzchppokgaoacgkqkzh>
 
 ## Proiecte
 
@@ -53,7 +53,7 @@ Regulile complete pentru agenți sunt în `AGENTS.md`.
 
 ## Deploy minim
 
-1. Link-uiește proiectul Supabase și rulează migrations din `supabase/migrations`. Deploy-ul curent folosește `habitat-crm-romania` (`mrnltzamrhgrgslmjzvu`), deoarece limita Supabase free blochează un al treilea proiect activ.
+1. Link-uiește proiectul Supabase și rulează migrations din `supabase/migrations`. Deploy-ul curent folosește proiectul dedicat `thor-crm-index-link` (`mqzchppokgaoacgkqkzh`).
 2. Setează secretele Cloudflare Worker: `SUPABASE_SERVICE_ROLE_KEY` și `ADMIN_API_KEY`.
 3. Creează Cloudflare Queues: `thor-crm-discover`, `thor-crm-fetch`, `thor-crm-match`.
 4. Actualizează `SUPABASE_URL` în `apps/worker/wrangler.jsonc`.

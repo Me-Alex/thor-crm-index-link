@@ -22,6 +22,9 @@ end;
 $$;
 
 drop policy if exists "org admins can manage memberships" on public.organization_members;
+drop policy if exists "org admins can insert memberships" on public.organization_members;
+drop policy if exists "org admins can update memberships" on public.organization_members;
+drop policy if exists "org admins can delete memberships" on public.organization_members;
 
 create policy "org admins can insert memberships"
 on public.organization_members

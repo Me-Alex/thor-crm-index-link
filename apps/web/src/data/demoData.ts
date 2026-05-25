@@ -64,7 +64,7 @@ export interface SourceHealth {
 
 export const workerHealthUrl = "https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health";
 export const githubRepoUrl = "https://github.com/Me-Alex/thor-crm-index-link";
-export const supabaseProjectUrl = "https://mrnltzamrhgrgslmjzvu.supabase.co";
+export const supabaseProjectUrl = "https://mqzchppokgaoacgkqkzh.supabase.co";
 
 export const demoListings: DemoListing[] = [
   {

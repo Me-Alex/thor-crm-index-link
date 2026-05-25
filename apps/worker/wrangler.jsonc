@@ -12,7 +12,7 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
-    "SUPABASE_URL": "https://mrnltzamrhgrgslmjzvu.supabase.co"
+    "SUPABASE_URL": "https://mqzchppokgaoacgkqkzh.supabase.co"
   },
   "triggers": {
     "crons": [

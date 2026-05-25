@@ -11,7 +11,7 @@ Versiunea web este un dashboard public demo pentru Thor CRM Index + Link. Nu imp
 - `apps/web`: React + Vite + TypeScript.
 - Date demo locale pentru listing-uri, alerte, saved searches si health.
 - Health live catre Worker-ul Cloudflare deja publicat: `https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health`.
-- Supabase este prezentat ca backend conectat (`mrnltzamrhgrgslmjzvu`), dar citirea anonima din tabele ramane blocata corect de RLS pana cand exista login.
+- Supabase este prezentat ca backend conectat (`mqzchppokgaoacgkqkzh`), dar citirea anonima din tabele ramane blocata corect de RLS pana cand exista login.
 - Deploy pe Cloudflare Pages, separat de Worker.
 
 ## Ecrane
