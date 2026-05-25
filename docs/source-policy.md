@@ -58,14 +58,17 @@ The crawler must use:
 The current crawler implementation supports a controlled source registry for Romanian real-estate portals:
 
 - `imobiliare`, `storia`, `olx`, `publi24`, `romimo`, `homezz`, `anuntul`, `lajumate`.
-- `imobiliare` is the only source enabled for initial live crawl; the other real portal sources stay `mode = off`, `allowLiveCrawl = false`, and `reviewStatus = pending_review`.
+- All registered real portal sources are enabled for initial controlled crawling with `mode = on`, `allowLiveCrawl = true`, and `reviewStatus = approved_initial_crawl`.
 - Discovery checks source status before network access and skips inactive sources without fetching.
 - Active reviewed sources must pass `robots.txt` policy before fetching a sitemap or listing seed URL.
 - Sitemap discovery only keeps same-origin HTTP(S) URLs and caps the number of discovered links.
+- HTML-listing discovery is used only for sources whose public sitemap does not expose listing-detail URLs reliably.
 - Generic JSON-LD parsing extracts only normalized index fields: title, description excerpt, price, area, rooms, location, property type, transaction type, and source URL.
+- Parser profiles prefer explicit JSON-LD, nested `mainEntity`/`Offer` fields, and labeled visible characteristics such as `Suprafata utila`; hidden script/style text is ignored for field extraction.
+- If required fields are absent or ambiguous, parsing fails closed instead of persisting low-confidence listing data.
 - Tests use local fixtures and mocked fetch calls; CI must not crawl real portal pages.
 
-Turning any additional real portal `on` requires policy/legal review, adapter validation on fixtures, and an explicit production change. Do not activate all sources at once.
+Adding any new real portal requires policy/legal review, adapter validation on fixtures, conservative per-source limits, and an explicit production change. Keep the fast disable path available for every source.
 
 ## PII and retention
 

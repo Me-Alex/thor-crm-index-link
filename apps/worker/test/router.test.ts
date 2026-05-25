@@ -169,7 +169,7 @@ describe("handleRequest", () => {
     });
   });
 
-  it("bootstraps registered Romanian source policies with only imobiliare active", async () => {
+  it("bootstraps registered Romanian source policies with reviewed portals active", async () => {
     const writes: unknown[] = [];
     const response = await handleRequest(
       new Request("https://worker.test/admin/sources/bootstrap", {
@@ -214,10 +214,10 @@ describe("handleRequest", () => {
     expect(writes.find((write) => (write as { body: { id: string } }).body.id === "olx")).toMatchObject({
       body: {
         id: "olx",
-        mode: "off",
+        mode: "on",
         crawl_config: expect.objectContaining({
-          reviewStatus: "pending_review",
-          allowLiveCrawl: false
+          reviewStatus: "approved_initial_crawl",
+          allowLiveCrawl: true
         })
       }
     });

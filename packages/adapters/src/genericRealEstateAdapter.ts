@@ -21,15 +21,27 @@ export function createGenericRealEstateAdapter(source: SourceRegistryEntry): Lis
     },
     parseListingDetail(html: string, context: ParseContext): ListingParseResult {
       const jsonLd = firstListingLikeJsonLd(html);
-      const title = firstText(jsonLdString(jsonLd, "name"), jsonLdString(jsonLd, "headline"), extractMetaContent(html, ["og:title", "twitter:title"]), extractTagText(html, "title"), extractTagText(html, "h1"));
-      const description = firstText(jsonLdString(jsonLd, "description"), extractMetaContent(html, ["og:description", "description", "twitter:description"]));
-      const priceText = formatPriceText(jsonLdValue(jsonLd, ["offers", "price"]), jsonLdValue(jsonLd, ["offers", "priceCurrency"]), html);
-      const areaText = formatAreaText(jsonLdValue(jsonLd, ["floorSize", "value"]), jsonLdValue(jsonLd, ["floorSize", "unitText"])) ?? extractAreaText(html);
-      const roomsText = formatRoomsText(jsonLdValue(jsonLd, ["numberOfRooms"])) ?? extractRoomsText(html);
-      const propertyTypeText = inferPropertyTypeText(`${title ?? ""} ${context.url}`);
-      const transactionTypeText = inferTransactionTypeText(context.url);
-      const cityText = firstText(jsonLdString(jsonLd, ["address", "addressLocality"]), jsonLdString(jsonLd, "addressLocality"));
-      const districtText = firstText(jsonLdString(jsonLd, ["address", "addressRegion"]), jsonLdString(jsonLd, "addressRegion"));
+      const jsonLdRecords = jsonLdRecordCandidates(jsonLd);
+      const listingEntity = jsonLdRecords[0] ?? jsonLd;
+      const title = firstText(jsonLdString(listingEntity, "name"), jsonLdString(jsonLd, "name"), jsonLdString(jsonLd, "headline"), extractMetaContent(html, ["og:title", "twitter:title"]), extractTagText(html, "title"), extractTagText(html, "h1"));
+      const description = firstText(jsonLdString(listingEntity, "description"), jsonLdString(jsonLd, "description"), extractMetaContent(html, ["og:description", "description", "twitter:description"]));
+      const priceText = formatPriceText(
+        firstJsonLdValue(jsonLdRecords, [["offers", "price"], ["offers", "priceSpecification", "price"], ["priceSpecification", "price"], "price"]),
+        firstJsonLdValue(jsonLdRecords, [["offers", "priceCurrency"], ["offers", "priceSpecification", "priceCurrency"], ["priceSpecification", "priceCurrency"], "priceCurrency"]),
+        html
+      );
+      const areaText =
+        formatAreaText(
+          firstJsonLdValue(jsonLdRecords, [["floorSize", "value"], "floorSize"]) ?? additionalPropertyValue(jsonLdRecords, [/suprafata/u, /surface/u, /\barea\b/u]),
+          firstJsonLdValue(jsonLdRecords, [["floorSize", "unitText"], ["floorSize", "unitCode"]])
+        ) ?? extractAreaText(html);
+      const roomsText =
+        formatRoomsText(firstJsonLdValue(jsonLdRecords, ["numberOfRooms"]) ?? additionalPropertyValue(jsonLdRecords, [/camere/u, /rooms/u, /numar camere/u])) ??
+        extractRoomsText(`${title ?? ""} ${description ?? ""} ${html}`);
+      const propertyTypeText = inferPropertyTypeText(`${jsonLdTypeText(listingEntity)} ${title ?? ""} ${description ?? ""} ${context.url}`);
+      const transactionTypeText = inferTransactionTypeText(`${title ?? ""} ${description ?? ""} ${context.url}`);
+      const cityText = firstText(...jsonLdRecords.flatMap((record) => [jsonLdString(record, ["address", "addressLocality"]), jsonLdString(record, "addressLocality")]));
+      const districtText = firstText(...jsonLdRecords.flatMap((record) => [jsonLdString(record, ["address", "addressRegion"]), jsonLdString(record, "addressRegion")]));
       const sourceListingId = sourceListingIdFromUrl(context.url);
 
       const coverage = {
@@ -119,6 +131,74 @@ function firstListingLikeJsonLd(html: string): Record<string, unknown> | undefin
   });
 }
 
+function jsonLdRecordCandidates(value: Record<string, unknown> | undefined): Array<Record<string, unknown>> {
+  const records: Array<Record<string, unknown>> = [];
+  addRecord(records, value);
+  addRecord(records, firstRecord(jsonLdValue(value, "mainEntity")));
+  addRecord(records, firstRecord(jsonLdValue(value, ["offers", "itemOffered"])));
+  addRecord(records, firstRecord(jsonLdValue(value, ["mainEntity", "offers", "itemOffered"])));
+  return records;
+}
+
+function addRecord(records: Array<Record<string, unknown>>, value: Record<string, unknown> | undefined): void {
+  if (value && !records.includes(value)) {
+    records.push(value);
+  }
+}
+
+function firstRecord(value: unknown): Record<string, unknown> | undefined {
+  if (Array.isArray(value)) {
+    return value.find(isRecord);
+  }
+  return isRecord(value) ? value : undefined;
+}
+
+function firstJsonLdValue(records: readonly Record<string, unknown>[], paths: string | readonly string[] | ReadonlyArray<string | readonly string[]>): unknown {
+  const normalizedPaths = isJsonLdPath(paths) ? [paths] : paths;
+  for (const record of records) {
+    for (const path of normalizedPaths) {
+      const value = jsonLdValue(record, path);
+      if (scalarToText(value)) {
+        return value;
+      }
+    }
+  }
+  return undefined;
+}
+
+function isJsonLdPath(value: string | readonly string[] | ReadonlyArray<string | readonly string[]>): value is string | readonly string[] {
+  return typeof value === "string" || value.every((item) => typeof item === "string");
+}
+
+function additionalPropertyValue(records: readonly Record<string, unknown>[], namePatterns: readonly RegExp[]): unknown {
+  for (const pattern of namePatterns) {
+    for (const record of records) {
+      for (const property of jsonLdRecordArray(record["additionalProperty"])) {
+        const name = normalizeText(firstText(jsonLdString(property, "name"), jsonLdString(property, "propertyID")) ?? "");
+        if (pattern.test(name)) {
+          return jsonLdValue(property, "value");
+        }
+      }
+    }
+  }
+  return undefined;
+}
+
+function jsonLdRecordArray(value: unknown): Array<Record<string, unknown>> {
+  if (Array.isArray(value)) {
+    return value.filter(isRecord);
+  }
+  return isRecord(value) ? [value] : [];
+}
+
+function jsonLdTypeText(value: Record<string, unknown> | undefined): string {
+  const raw = jsonLdValue(value, "@type");
+  if (Array.isArray(raw)) {
+    return raw.map((item) => scalarToText(item)).filter(Boolean).join(" ");
+  }
+  return scalarToText(raw) ?? "";
+}
+
 function extractJsonLdObjects(html: string): Array<Record<string, unknown>> {
   return [...html.matchAll(/<script\b[^>]*type\s*=\s*["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/giu)].flatMap((match) => {
     try {
@@ -189,6 +269,9 @@ function formatAreaText(value: unknown, unitText: unknown): string | undefined {
   if (!area) {
     return undefined;
   }
+  if (/\b(mp|m2|m²|sqm|squaremeter|squaremeters)\b/iu.test(area)) {
+    return area;
+  }
   const unit = normalizeText(scalarToText(unitText) ?? "mp");
   if (unit && !/^(mp|m2|m²|sqm|squaremeter|squaremeters)$/.test(unit)) {
     return undefined;
@@ -198,7 +281,10 @@ function formatAreaText(value: unknown, unitText: unknown): string | undefined {
 
 function formatRoomsText(value: unknown): string | undefined {
   const rooms = scalarToText(value);
-  return rooms ? `${rooms} camere` : undefined;
+  if (!rooms) {
+    return undefined;
+  }
+  return /\b(camere|camera|rooms?)\b/iu.test(rooms) ? rooms : `${rooms} camere`;
 }
 
 function scalarToText(value: unknown): string | undefined {
@@ -230,13 +316,18 @@ function extractTagText(html: string, tagName: string): string | undefined {
 
 function extractPriceText(html: string): string | undefined {
   const text = normalizeVisibleText(html);
-  const match = text.match(/(?:€\s*)?(\d[\d\s.,]{2,})(?:\s*(?:€|eur|euro))\b/iu);
-  return match?.[1] ? `${match[1]} EUR` : undefined;
+  const match = text.match(/(?:€\s*)?(\d[\d\s.,]{2,})(?:\s*(?:€|eur|euro))(?![a-z0-9])/iu);
+  return match?.[1] ? `${match[1].trim()} EUR` : undefined;
 }
 
 function extractAreaText(html: string): string | undefined {
   const text = normalizeVisibleText(html);
-  const match = text.match(/(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:m²|m2|mp)\b/iu);
+  const normalizedText = normalizeText(text);
+  const labeledMatch = normalizedText.match(/\b(?:suprafata(?:\s+utila)?|surface|area)\s*:?\s*(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:m²|m2|mp)(?![a-z0-9])/iu);
+  if (labeledMatch?.[1]) {
+    return `${labeledMatch[1]} mp`;
+  }
+  const match = text.match(/(\d{1,5}(?:[.,]\d{1,2})?)\s*(?:m²|m2|mp)(?![a-z0-9])/iu);
   return match?.[1] ? `${match[1]} mp` : undefined;
 }
 
@@ -248,15 +339,15 @@ function extractRoomsText(html: string): string | undefined {
 
 function inferPropertyTypeText(value: string): string {
   const text = normalizeText(value);
-  if (/\b(apartament|garsoniera|studio)\b/.test(text)) return "apartament";
   if (/\b(casa|vila|duplex)\b/.test(text)) return "casa";
   if (/\bteren\b/.test(text)) return "teren";
   if (/\b(spatiu|birou|comercial)\b/.test(text)) return "spatiu comercial";
+  if (/\b(ap|apartament|apartment|garsoniera|studio)\b/.test(text) || /\b\d{1,2}\s+camere\b/.test(text)) return "apartament";
   return "altul";
 }
 
-function inferTransactionTypeText(url: string): string {
-  return /\b(inchiriere|inchirieri|inchiriat|rent)\b/iu.test(url) ? "inchiriere" : "vanzare";
+function inferTransactionTypeText(value: string): string {
+  return /\b(inchiriere|inchirieri|inchiriat|inchiriez|inchiriaza|chirie|rent)\b/iu.test(value) ? "inchiriere" : "vanzare";
 }
 
 function sourceListingIdFromUrl(value: string): string | undefined {
@@ -298,7 +389,8 @@ function decodeHtml(value: string | undefined): string | undefined {
 }
 
 function normalizeVisibleText(html: string): string {
-  return stripTags(html)?.replace(/\s+/g, " ").trim() ?? "";
+  const withoutNonVisibleBlocks = html.replace(/<script\b[\s\S]*?<\/script>/giu, " ").replace(/<style\b[\s\S]*?<\/style>/giu, " ");
+  return stripTags(withoutNonVisibleBlocks)?.replace(/\s+/g, " ").trim() ?? "";
 }
 
 function normalizeText(value: string): string {

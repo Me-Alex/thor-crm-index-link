@@ -32,6 +32,11 @@ export interface SourceRegistryEntry {
 const genericMode = "off" satisfies SourceMode;
 const genericRateLimitPerMinute = 6;
 const genericSourceTrust = 0.35;
+const activeInitialCrawl = {
+  mode: "on",
+  reviewStatus: "approved_initial_crawl",
+  allowLiveCrawl: true
+} as const;
 
 export const sourceRegistry: readonly SourceRegistryEntry[] = [
   {
@@ -73,50 +78,88 @@ export const sourceRegistry: readonly SourceRegistryEntry[] = [
     id: "storia",
     name: "Storia.ro",
     baseUrl: "https://www.storia.ro",
-    seedUrls: ["https://www.storia.ro/ro/rezultate/vanzare/apartament", "https://www.storia.ro/ro/rezultate/inchiriere/apartament"],
-    detailUrlPatterns: ["/ro/oferta/", "/(?:vanzare|inchiriere)/"]
+    crawlStrategy: "html_links",
+    seedUrls: ["https://www.storia.ro/ro/rezultate/inchiriere/apartament/bucuresti", "https://www.storia.ro/ro/rezultate/vanzare/apartament/bucuresti"],
+    sitemapUrls: [],
+    detailUrlPatterns: ["/ro/oferta/"],
+    maxDiscoverUrls: 12,
+    maxSitemapBytes: 2_000_000,
+    maxDetailBytes: 1_000_000,
+    ...activeInitialCrawl
   }),
   realPortal({
     id: "olx",
     name: "OLX Imobiliare",
     baseUrl: "https://www.olx.ro",
-    seedUrls: ["https://www.olx.ro/imobiliare/apartamente-garsoniere-de-vanzare/", "https://www.olx.ro/imobiliare/apartamente-garsoniere-de-inchiriat/"],
-    detailUrlPatterns: ["/d/oferta/", "/imobiliare/"]
+    crawlStrategy: "html_links",
+    seedUrls: ["https://www.olx.ro/imobiliare/apartamente-garsoniere-de-inchiriat/bucuresti/", "https://www.olx.ro/imobiliare/apartamente-garsoniere-de-vanzare/bucuresti/"],
+    sitemapUrls: [],
+    detailUrlPatterns: ["/d/oferta/"],
+    maxDiscoverUrls: 10,
+    maxSitemapBytes: 4_000_000,
+    maxDetailBytes: 4_000_000,
+    ...activeInitialCrawl
   }),
   realPortal({
     id: "publi24",
     name: "Publi24 Imobiliare",
     baseUrl: "https://www.publi24.ro",
     seedUrls: ["https://www.publi24.ro/anunturi/imobiliare/de-vanzare/", "https://www.publi24.ro/anunturi/imobiliare/de-inchiriat/"],
-    detailUrlPatterns: ["/anunturi/imobiliare/", "/(?:de-vanzare|de-inchiriat)/"]
+    sitemapUrls: ["https://www.publi24.ro/Sitemaps/sitemap-publi24-articles-by-category-Imobiliare-1.xml"],
+    detailUrlPatterns: ["/anunturi/imobiliare/", "/(?:de-vanzare|de-inchiriat)/"],
+    maxDiscoverUrls: 15,
+    maxSitemapBytes: 8_000_000,
+    maxDetailBytes: 2_000_000,
+    ...activeInitialCrawl
   }),
   realPortal({
     id: "romimo",
     name: "Romimo.ro",
     baseUrl: "https://www.romimo.ro",
     seedUrls: ["https://www.romimo.ro/anunturi/imobiliare/de-vanzare/", "https://www.romimo.ro/anunturi/imobiliare/de-inchiriat/"],
-    detailUrlPatterns: ["/anunturi/imobiliare/", "/(?:vanzare|inchiriere|de-vanzare|de-inchiriat)"]
+    sitemapUrls: ["https://www.romimo.ro/Sitemaps/sitemap-romimo-articles-by-category-Imobiliare-1.xml"],
+    detailUrlPatterns: ["/anunturi/imobiliare/", "/(?:vanzare|inchiriere|de-vanzare|de-inchiriat)"],
+    maxDiscoverUrls: 15,
+    maxSitemapBytes: 8_000_000,
+    maxDetailBytes: 2_000_000,
+    ...activeInitialCrawl
   }),
   realPortal({
     id: "homezz",
     name: "HomeZZ.ro",
-    baseUrl: "https://www.homezz.ro",
-    seedUrls: ["https://www.homezz.ro/anunturi/vanzari-apartamente/", "https://www.homezz.ro/anunturi/inchirieri-apartamente/"],
-    detailUrlPatterns: ["/anunturi/", "/(?:vanzari|inchirieri)-"]
+    baseUrl: "https://homezz.ro",
+    seedUrls: ["https://homezz.ro/anunturi/vanzari-apartamente/", "https://homezz.ro/anunturi/inchirieri-apartamente/"],
+    sitemapUrls: ["https://homezz.ro/sitemap/sitemap-anunturi-apartamente-vanzare.xml", "https://homezz.ro/sitemap/sitemap-anunturi-apartamente-inchiriere.xml"],
+    detailUrlPatterns: ["/.+-\\d+\\.html$"],
+    maxDiscoverUrls: 20,
+    maxSitemapBytes: 6_000_000,
+    maxDetailBytes: 2_000_000,
+    ...activeInitialCrawl
   }),
   realPortal({
     id: "anuntul",
     name: "Anuntul.ro Imobiliare",
     baseUrl: "https://www.anuntul.ro",
+    crawlStrategy: "html_links",
     seedUrls: ["https://www.anuntul.ro/anunturi-imobiliare-vanzari/", "https://www.anuntul.ro/anunturi-imobiliare-inchirieri/"],
-    detailUrlPatterns: ["/anunt-", "/anunturi-imobiliare"]
+    sitemapUrls: [],
+    detailUrlPatterns: ["/anunt-(?:inchiriere|vanzare|garsoniera|apartament|casa)"],
+    maxDiscoverUrls: 20,
+    maxSitemapBytes: 500_000,
+    maxDetailBytes: 1_000_000,
+    ...activeInitialCrawl
   }),
   realPortal({
     id: "lajumate",
     name: "LaJumate Imobiliare",
-    baseUrl: "https://www.lajumate.ro",
-    seedUrls: ["https://www.lajumate.ro/anunturi-imobiliare/", "https://www.lajumate.ro/imobiliare/"],
-    detailUrlPatterns: ["/anunturi-imobiliare/", "/imobiliare/"]
+    baseUrl: "https://lajumate.ro",
+    seedUrls: ["https://lajumate.ro/anunturi-imobiliare/", "https://lajumate.ro/imobiliare/"],
+    sitemapUrls: ["https://lajumate.ro/sitemap-anunt-1.xml"],
+    detailUrlPatterns: ["/ad/(?:apartament|garsoniera|casa|teren|vand|inchiriez|inchiriere|vanzare)"],
+    maxDiscoverUrls: 15,
+    maxSitemapBytes: 5_000_000,
+    maxDetailBytes: 2_000_000,
+    ...activeInitialCrawl
   })
 ];
 
@@ -132,6 +175,7 @@ interface RealPortalInput {
   id: string;
   name: string;
   baseUrl: string;
+  crawlStrategy?: SourceCrawlStrategy;
   seedUrls: readonly string[];
   sitemapUrls?: readonly string[];
   detailUrlPatterns: readonly string[];
@@ -156,7 +200,7 @@ function realPortal(input: RealPortalInput): SourceRegistryEntry {
       adapter: "generic-jsonld",
       adapterStatus: "generic_implemented_pending_source_review",
       reviewStatus: input.reviewStatus ?? "pending_review",
-      crawlStrategy: "sitemap",
+      crawlStrategy: input.crawlStrategy ?? "sitemap",
       seedUrls: input.seedUrls,
       sitemapUrls: input.sitemapUrls ?? [`${input.baseUrl}/sitemap.xml`],
       detailUrlPatterns: input.detailUrlPatterns,
