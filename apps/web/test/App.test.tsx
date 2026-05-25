@@ -306,4 +306,43 @@ describe("App", () => {
     expect(screen.getAllByText(/Live API/i)).toHaveLength(2);
     await waitFor(() => expect(screen.queryByText("Apartament 2 camere Titan")).not.toBeInTheDocument());
   });
+
+  it("renders live source health cards when the Worker API returns operational metrics", async () => {
+    vi.stubEnv("VITE_WORKER_API_URL", "https://worker.example.dev");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url === "https://worker.example.dev/api/source-health") {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "portal-live",
+                name: "Portal Live Health",
+                mode: "on",
+                listingCount: 42,
+                latestSeenAt: "2026-05-25T11:25:50.000Z",
+                crawlSuccessRate: 1,
+                parseSuccessRate: 0.8,
+                matchRate: 0,
+                timeToIndexMinutes: 3
+              }
+            ],
+            count: 1
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      return new Response("unavailable", { status: 404 });
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Portal Live Health")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
+  });
 });
