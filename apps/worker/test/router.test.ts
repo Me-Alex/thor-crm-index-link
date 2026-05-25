@@ -40,6 +40,80 @@ describe("handleRequest", () => {
     });
   });
 
+  it("returns live source health from Supabase without exposing credentials", async () => {
+    const fetchCalls: string[] = [];
+    const response = await handleRequest(new Request("https://worker.test/api/source-health"), env(), {
+      fetch: async (input, init) => {
+        fetchCalls.push(String(input));
+        const headers = new Headers(init?.headers);
+        expect(headers.get("apikey")).toBe("secret");
+        expect(headers.get("authorization")).toBe("Bearer secret");
+
+        if (String(input).includes("/rest/v1/sources")) {
+          return Response.json([
+            {
+              id: "imobiliare",
+              name: "Imobiliare.ro",
+              mode: "on",
+              crawl_config: { allowLiveCrawl: true }
+            },
+            {
+              id: "olx",
+              name: "OLX Imobiliare",
+              mode: "degraded",
+              crawl_config: { allowLiveCrawl: true }
+            }
+          ]);
+        }
+
+        if (String(input).includes("/rest/v1/canonical_listing_links")) {
+          return Response.json([{ source_listing_id: "sl-imobiliare-1" }, { source_listing_id: "sl-olx-1" }]);
+        }
+
+        return Response.json([
+          { id: "sl-imobiliare-1", source_id: "imobiliare", crawl_status: "active", last_seen_at: "2026-05-25T11:25:50.000Z" },
+          { id: "sl-imobiliare-2", source_id: "imobiliare", crawl_status: "parse_failed", last_seen_at: "2026-05-25T11:20:50.000Z" },
+          { id: "sl-olx-1", source_id: "olx", crawl_status: "active", last_seen_at: "2026-05-25T11:15:50.000Z" }
+        ]);
+      }
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
+    await expect(response.json()).resolves.toEqual({
+      data: [
+        {
+          id: "imobiliare",
+          name: "Imobiliare.ro",
+          mode: "on",
+          listingCount: 2,
+          latestSeenAt: "2026-05-25T11:25:50.000Z",
+          crawlSuccessRate: 1,
+          parseSuccessRate: 0.5,
+          matchRate: 0.5,
+          timeToIndexMinutes: expect.any(Number)
+        },
+        {
+          id: "olx",
+          name: "OLX Imobiliare",
+          mode: "degraded",
+          listingCount: 1,
+          latestSeenAt: "2026-05-25T11:15:50.000Z",
+          crawlSuccessRate: 1,
+          parseSuccessRate: 1,
+          matchRate: 1,
+          timeToIndexMinutes: expect.any(Number)
+        }
+      ],
+      count: 2
+    });
+    expect(fetchCalls).toEqual([
+      "https://project.supabase.co/rest/v1/sources?select=id%2Cname%2Cmode%2Ccrawl_config&order=id.asc",
+      "https://project.supabase.co/rest/v1/source_listings?select=id%2Csource_id%2Clast_seen_at%2Ccrawl_status&order=last_seen_at.desc&limit=2000",
+      "https://project.supabase.co/rest/v1/canonical_listing_links?select=source_listing_id&limit=5000"
+    ]);
+  });
+
   it("returns not ready when Supabase credentials are missing", async () => {
     const response = await handleRequest(new Request("https://worker.test/ready"), {
       ...env(),

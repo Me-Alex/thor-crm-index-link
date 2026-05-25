@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   fetchWorkerHealth,
   fetchWorkerListings,
+  fetchWorkerSourceHealth,
   ListingsApiError,
   resolveWorkerApiBaseUrl
 } from "../src/lib/listingsApi";
@@ -102,5 +103,47 @@ describe("fetchWorkerHealth", () => {
 
     await expect(fetchWorkerHealth({ baseUrl: "https://worker.example.dev", fetchImpl })).resolves.toEqual(health);
     expect(fetchImpl).toHaveBeenCalledWith("https://worker.example.dev/health", expect.any(Object));
+  });
+});
+
+describe("fetchWorkerSourceHealth", () => {
+  it("loads live source health and maps it to dashboard cards", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              id: "olx",
+              name: "OLX Imobiliare",
+              mode: "degraded",
+              listingCount: 12,
+              latestSeenAt: "2026-05-25T11:25:50.000Z",
+              crawlSuccessRate: 1,
+              parseSuccessRate: 0.75,
+              matchRate: 0,
+              timeToIndexMinutes: 6
+            }
+          ],
+          count: 1
+        }),
+        {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        }
+      )
+    );
+
+    await expect(fetchWorkerSourceHealth({ baseUrl: "https://worker.example.dev", fetchImpl })).resolves.toEqual([
+      {
+        id: "olx",
+        name: "OLX Imobiliare",
+        mode: "degraded",
+        crawlSuccessRate: 1,
+        parseSuccessRate: 0.75,
+        matchRate: 0,
+        timeToIndexMinutes: 6
+      }
+    ]);
+    expect(fetchImpl).toHaveBeenCalledWith("https://worker.example.dev/api/source-health", expect.any(Object));
   });
 });

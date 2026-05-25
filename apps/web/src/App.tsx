@@ -12,7 +12,7 @@ import {
   type TransactionType
 } from "./data/demoData";
 import { filterListings, summarizeListings, type ListingFilters } from "./lib/filterListings";
-import { fetchWorkerListings, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
+import { fetchWorkerListings, fetchWorkerSourceHealth, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
 import {
   buildDemoTenantWorkflow,
   demoOrgId,
@@ -56,6 +56,7 @@ function App() {
   const [listings, setListings] = useState<DemoListing[]>(demoListings);
   const [dataMode, setDataMode] = useState<"fallback" | "live">("fallback");
   const [dataMessage, setDataMessage] = useState("Se incearca incarcarea din Worker API.");
+  const [sourceHealthCards, setSourceHealthCards] = useState(sourceHealth);
   const [isLoadingListings, setIsLoadingListings] = useState(false);
   const [workflowItems, setWorkflowItems] = useState<TenantWorkflowItem[]>(() =>
     buildDemoTenantWorkflow(demoListings, demoTenantId)
@@ -106,6 +107,33 @@ function App() {
       .finally(() => {
         if (!ignoreResult) {
           setIsLoadingListings(false);
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignoreResult = false;
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+
+    if (!workerApiBaseUrl) {
+      return undefined;
+    }
+
+    fetchWorkerSourceHealth({ baseUrl: workerApiBaseUrl })
+      .then((apiSourceHealth) => {
+        if (ignoreResult || apiSourceHealth.length === 0) {
+          return;
+        }
+
+        setSourceHealthCards(apiSourceHealth);
+      })
+      .catch(() => {
+        if (!ignoreResult) {
+          setSourceHealthCards(sourceHealth);
         }
       });
 
@@ -466,7 +494,7 @@ function App() {
               </a>
             </div>
             <div className="health-grid">
-              {sourceHealth.map((source) => (
+              {sourceHealthCards.map((source) => (
                 <article key={source.id} className={`health-card mode-${source.mode}`}>
                   <div>
                     <strong>{source.name}</strong>
