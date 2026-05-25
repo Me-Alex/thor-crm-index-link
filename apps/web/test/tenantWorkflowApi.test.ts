@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { demoListings } from "../src/data/demoData";
 import {
   buildDemoTenantWorkflow,
+  createTenantWorkflowNote,
   demoOrgId,
   fetchTenantWorkflow,
   updateTenantWorkflowStatus
@@ -35,8 +36,15 @@ describe("fetchTenantWorkflow", () => {
               lastSeenByOrgAt: "2026-05-25T09:00:00.000Z",
               updatedAt: "2026-05-25T10:00:00.000Z"
             },
-            tags: [],
-            notes: []
+            tags: [{ id: "tag-1", name: "urgent", color: "#ef4444" }],
+            notes: [
+              {
+                id: "note-1",
+                body: "Sunat proprietar.",
+                authorUserId: "user-1",
+                createdAt: "2026-05-25T10:15:00.000Z"
+              }
+            ]
           }
         }),
         {
@@ -65,7 +73,16 @@ describe("fetchTenantWorkflow", () => {
         assignee: "user-1",
         sourceName: "imobiliare.ro",
         sourceUrl: "https://example.test/imobiliare/titan-2-camere",
-        updatedAt: "2026-05-25T10:00:00.000Z"
+        updatedAt: "2026-05-25T10:00:00.000Z",
+        tags: [{ id: "tag-1", name: "urgent", color: "#ef4444" }],
+        notes: [
+          {
+            id: "note-1",
+            body: "Sunat proprietar.",
+            authorUserId: "user-1",
+            createdAt: "2026-05-25T10:15:00.000Z"
+          }
+        ]
       }
     ]);
     expect(fetchImpl).toHaveBeenCalledWith(
@@ -74,6 +91,52 @@ describe("fetchTenantWorkflow", () => {
         headers: expect.objectContaining({
           authorization: "Bearer user-token"
         })
+      })
+    );
+  });
+});
+
+describe("createTenantWorkflowNote", () => {
+  it("posts tenant notes through the authenticated Worker endpoint", async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          data: {
+            id: "note-1",
+            body: "Verificat link sursa.",
+            authorUserId: "user-1",
+            createdAt: "2026-05-25T11:00:00.000Z"
+          }
+        }),
+        { status: 201 }
+      )
+    );
+
+    await expect(
+      createTenantWorkflowNote({
+        baseUrl: "https://worker.example.dev",
+        orgId: demoOrgId,
+        listingId: "listing-1",
+        body: "Verificat link sursa.",
+        accessToken: "user-token",
+        fetchImpl
+      })
+    ).resolves.toEqual({
+      id: "note-1",
+      body: "Verificat link sursa.",
+      authorUserId: "user-1",
+      createdAt: "2026-05-25T11:00:00.000Z"
+    });
+
+    expect(fetchImpl).toHaveBeenCalledWith(
+      `https://worker.example.dev/api/orgs/${demoOrgId}/listings/listing-1/notes`,
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          authorization: "Bearer user-token",
+          "content-type": "application/json"
+        }),
+        body: JSON.stringify({ body: "Verificat link sursa." })
       })
     );
   });

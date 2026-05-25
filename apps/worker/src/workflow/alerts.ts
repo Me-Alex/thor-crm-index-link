@@ -37,7 +37,8 @@ export function planAlertDeliveries(input: PlanAlertDeliveriesInput): AlertDeliv
       const deliveryKey = alertDeliveryKey({
         tenantId: input.tenantId,
         savedSearchId: search.savedSearchId,
-        canonicalListingId: listing.canonicalListingId
+        canonicalListingId: listing.canonicalListingId,
+        channel: search.alertChannel
       });
 
       if (!evaluation.matches || emittedKeys.has(deliveryKey)) {
@@ -49,7 +50,7 @@ export function planAlertDeliveries(input: PlanAlertDeliveriesInput): AlertDeliv
         tenantId: input.tenantId,
         savedSearchId: search.savedSearchId,
         canonicalListingId: listing.canonicalListingId,
-        channel: "in_app",
+        channel: search.alertChannel,
         evaluatedAt: input.evaluatedAt,
         deliveryKey,
         matchedReasons: evaluation.reasons
@@ -108,5 +109,5 @@ function evaluateKeywords(listing: WorkflowListing, keywords: string[] | undefin
 }
 
 function alertDeliveryKey(delivery: ExistingAlertDelivery): string {
-  return `${delivery.tenantId}:${delivery.savedSearchId}:${delivery.canonicalListingId}`;
+  return `${delivery.tenantId}:${delivery.savedSearchId}:${delivery.canonicalListingId}:${delivery.channel}`;
 }

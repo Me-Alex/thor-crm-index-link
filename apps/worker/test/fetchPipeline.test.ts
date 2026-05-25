@@ -112,7 +112,7 @@ describe("handleFetchMessage", () => {
       "https://project.supabase.co/rest/v1/canonical_listings",
       "https://project.supabase.co/rest/v1/canonical_listing_links?on_conflict=source_listing_id",
       "https://project.supabase.co/rest/v1/listing_history",
-      "https://project.supabase.co/rest/v1/alerts?select=id%2Corg_id%2Csaved_search_id%2Cchannel%2Cis_enabled&is_enabled=eq.true&channel=eq.in_app"
+      "https://project.supabase.co/rest/v1/alerts?select=id%2Corg_id%2Csaved_search_id%2Cchannel%2Cis_enabled&is_enabled=eq.true"
     ]);
   });
 
@@ -359,7 +359,8 @@ describe("handleFetchMessage", () => {
         canonical_listing_id: "canonical-listing-id",
         status: "pending",
         payload: {
-          delivery_key: "tenant-a:search-1:canonical-listing-id",
+          delivery_key: "tenant-a:search-1:canonical-listing-id:in_app",
+          channel: "in_app",
           evaluated_at: "2026-05-25T00:00:00.000Z",
           matched_reasons: expect.arrayContaining(["city_match", "keyword_match"])
         }

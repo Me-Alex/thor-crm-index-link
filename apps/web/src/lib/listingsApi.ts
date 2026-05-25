@@ -40,6 +40,7 @@ interface WorkerApiSourceHealth {
   latestSeenAt: string | null;
   crawlSuccessRate: number;
   parseSuccessRate: number;
+  fieldCoverageRate: number;
   matchRate: number;
   timeToIndexMinutes: number;
 }
@@ -196,6 +197,7 @@ function isWorkerApiSourceHealthLike(source: unknown): source is WorkerApiSource
     (source.latestSeenAt === null || typeof source.latestSeenAt === "string") &&
     typeof source.crawlSuccessRate === "number" &&
     typeof source.parseSuccessRate === "number" &&
+    typeof source.fieldCoverageRate === "number" &&
     typeof source.matchRate === "number" &&
     typeof source.timeToIndexMinutes === "number"
   );
@@ -279,6 +281,7 @@ function toSourceHealth(source: WorkerApiSourceHealth): SourceHealth {
     ...(source.latestSeenAt ? { latestSeenAt: source.latestSeenAt } : {}),
     crawlSuccessRate: source.crawlSuccessRate,
     parseSuccessRate: source.parseSuccessRate,
+    fieldCoverageRate: source.fieldCoverageRate,
     matchRate: source.matchRate,
     timeToIndexMinutes: source.timeToIndexMinutes
   };

@@ -32,10 +32,13 @@ interface SpatialAppShellProps {
   savedSearchName: string;
   savedSearchCriteria: string;
   savedSearchFrequency: SavedSearch["frequency"];
+  savedSearchAlertChannel: SavedSearch["alertChannel"];
+  savedSearchAlertsEnabled: boolean;
   savedSearchMessage: string;
   editingSavedSearchId: string | null;
   onRefreshListings: () => void;
   onWorkflowStatusChange: (listingId: string, status: TenantWorkflowStatus) => void;
+  onWorkflowNoteCreate: (listingId: string, body: string) => void;
   onAuthEmailChange: (email: string) => void;
   onAuthPasswordChange: (password: string) => void;
   onAuthSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -43,6 +46,8 @@ interface SpatialAppShellProps {
   onSavedSearchNameChange: (name: string) => void;
   onSavedSearchCriteriaChange: (criteria: string) => void;
   onSavedSearchFrequencyChange: (frequency: SavedSearch["frequency"]) => void;
+  onSavedSearchAlertChannelChange: (channel: SavedSearch["alertChannel"]) => void;
+  onSavedSearchAlertsEnabledChange: (enabled: boolean) => void;
   onSavedSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSavedSearchEdit: (search: SavedSearch) => void;
   onSavedSearchDelete: (search: SavedSearch) => void;
@@ -79,6 +84,8 @@ export function SpatialAppShell(props: SpatialAppShellProps) {
         savedSearchName={props.savedSearchName}
         savedSearchCriteria={props.savedSearchCriteria}
         savedSearchFrequency={props.savedSearchFrequency}
+        savedSearchAlertChannel={props.savedSearchAlertChannel}
+        savedSearchAlertsEnabled={props.savedSearchAlertsEnabled}
         savedSearchMessage={props.savedSearchMessage}
         editingSavedSearchId={props.editingSavedSearchId}
         onAuthEmailChange={props.onAuthEmailChange}
@@ -88,6 +95,8 @@ export function SpatialAppShell(props: SpatialAppShellProps) {
         onSavedSearchNameChange={props.onSavedSearchNameChange}
         onSavedSearchCriteriaChange={props.onSavedSearchCriteriaChange}
         onSavedSearchFrequencyChange={props.onSavedSearchFrequencyChange}
+        onSavedSearchAlertChannelChange={props.onSavedSearchAlertChannelChange}
+        onSavedSearchAlertsEnabledChange={props.onSavedSearchAlertsEnabledChange}
         onSavedSearchSubmit={props.onSavedSearchSubmit}
         onSavedSearchEdit={props.onSavedSearchEdit}
         onSavedSearchDelete={props.onSavedSearchDelete}
@@ -114,6 +123,7 @@ export function SpatialAppShell(props: SpatialAppShellProps) {
         workflowActionMessage={props.workflowActionMessage}
         isLoadingWorkflow={props.isLoadingWorkflow}
         onWorkflowStatusChange={props.onWorkflowStatusChange}
+        onWorkflowNoteCreate={props.onWorkflowNoteCreate}
         onFocusNode={workspace.selectNode}
       />
     </main>

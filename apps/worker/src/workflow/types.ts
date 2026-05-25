@@ -36,6 +36,7 @@ export interface SavedSearch {
   tenantId: string;
   name: string;
   alertsEnabled: boolean;
+  alertChannel: "in_app" | "email" | "webhook";
   criteria: SavedSearchCriteria;
 }
 
@@ -48,10 +49,10 @@ export interface ExistingAlertDelivery {
   tenantId: string;
   savedSearchId: string;
   canonicalListingId: string;
+  channel: "in_app" | "email" | "webhook";
 }
 
 export interface AlertDeliveryCandidate extends ExistingAlertDelivery {
-  channel: "in_app";
   evaluatedAt: string;
   deliveryKey: string;
   matchedReasons: string[];

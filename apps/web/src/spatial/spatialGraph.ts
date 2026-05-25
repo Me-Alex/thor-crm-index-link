@@ -141,7 +141,7 @@ function buildWorkflowNode(listing: DemoListing, workflowItems: TenantWorkflowIt
     width: 320,
     tone: "workflow",
     listingId: listing.id,
-    noteCount: 0,
+    noteCount: workflowItem?.notes.length ?? 0,
     metrics: [
       { label: "Status", value: workflowItem ? workflowLabel(workflowItem.status) : listing.status },
       { label: "Agent", value: workflowItem?.assignee ?? listing.assignee },
@@ -308,6 +308,7 @@ function toSourceHealthDetail(source: SourceHealth): SpatialSourceHealthDetail {
     ...(typeof optionalDetails.latestSeenAt === "string" ? { latestSeenAt: optionalDetails.latestSeenAt } : {}),
     crawlSuccessRate: source.crawlSuccessRate,
     parseSuccessRate: source.parseSuccessRate,
+    fieldCoverageRate: source.fieldCoverageRate,
     matchRate: source.matchRate,
     timeToIndexMinutes: source.timeToIndexMinutes
   };

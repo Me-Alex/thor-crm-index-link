@@ -264,6 +264,7 @@ describe("App", () => {
               latestSeenAt: "2026-05-25T11:25:50.000Z",
               crawlSuccessRate: 1,
               parseSuccessRate: 0.8,
+              fieldCoverageRate: 0.75,
               matchRate: 0,
               timeToIndexMinutes: 3
             }
@@ -285,6 +286,7 @@ describe("App", () => {
     expect(within(inspector).getByText(/Listings: 42/i)).toBeInTheDocument();
     expect(within(inspector).getByText(/Latest seen: 2026-05-25T11:25:50.000Z/i)).toBeInTheDocument();
     expect(within(inspector).getByText(/Time-to-index: 3 min/i)).toBeInTheDocument();
+    expect(within(inspector).getByText(/Coverage: 75%/i)).toBeInTheDocument();
     expect(within(inspector).getByText("80%")).toBeInTheDocument();
   });
 });

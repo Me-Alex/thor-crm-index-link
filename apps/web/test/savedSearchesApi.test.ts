@@ -16,7 +16,7 @@ describe("tenant saved searches API client", () => {
             id: "search-1",
             name: "Bucuresti apartamente",
             criteria: { query: "sale apartment Bucuresti max 120000" },
-            alerts: [{ frequency: "near_real_time" }]
+            alerts: [{ channel: "webhook", frequency: "near_real_time", isEnabled: false }]
           }
         ],
         count: 1
@@ -36,7 +36,9 @@ describe("tenant saved searches API client", () => {
         name: "Bucuresti apartamente",
         criteria: "sale apartment Bucuresti max 120000",
         matches: 0,
-        frequency: "near real-time"
+        frequency: "near real-time",
+        alertChannel: "webhook",
+        alertsEnabled: false
       }
     ]);
     expect(fetchImpl).toHaveBeenCalledWith(
@@ -59,7 +61,7 @@ describe("tenant saved searches API client", () => {
               id: "search-1",
               name: "Noua cautare",
               criteria: { query: "Bucuresti 2 camere" },
-              alerts: [{ frequency: "hourly" }]
+              alerts: [{ channel: "email", frequency: "hourly", isEnabled: true }]
             }
           },
           { status: 201 }
@@ -71,7 +73,7 @@ describe("tenant saved searches API client", () => {
             id: "search-1",
             name: "Cautare editata",
             criteria: { query: "Bucuresti 3 camere" },
-            alerts: [{ frequency: "daily" }]
+            alerts: [{ channel: "webhook", frequency: "daily", isEnabled: false }]
           }
         })
       )
@@ -85,9 +87,11 @@ describe("tenant saved searches API client", () => {
         name: "Noua cautare",
         criteria: "Bucuresti 2 camere",
         frequency: "hourly",
+        alertChannel: "email",
+        alertsEnabled: true,
         fetchImpl
       })
-    ).resolves.toMatchObject({ id: "search-1", name: "Noua cautare", frequency: "hourly" });
+    ).resolves.toMatchObject({ id: "search-1", name: "Noua cautare", frequency: "hourly", alertChannel: "email", alertsEnabled: true });
 
     await expect(
       updateTenantSavedSearch({
@@ -98,9 +102,11 @@ describe("tenant saved searches API client", () => {
         name: "Cautare editata",
         criteria: "Bucuresti 3 camere",
         frequency: "daily",
+        alertChannel: "webhook",
+        alertsEnabled: false,
         fetchImpl
       })
-    ).resolves.toMatchObject({ id: "search-1", name: "Cautare editata", frequency: "daily" });
+    ).resolves.toMatchObject({ id: "search-1", name: "Cautare editata", frequency: "daily", alertChannel: "webhook", alertsEnabled: false });
 
     await expect(
       deleteTenantSavedSearch({
@@ -115,7 +121,19 @@ describe("tenant saved searches API client", () => {
     expect(fetchImpl).toHaveBeenNthCalledWith(
       1,
       `https://worker.example.dev/api/orgs/${demoOrgId}/saved-searches`,
-      expect.objectContaining({ method: "POST" })
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          name: "Noua cautare",
+          criteria: { query: "Bucuresti 2 camere" },
+          alert: {
+            channel: "email",
+            frequency: "hourly",
+            thresholdMinutes: 5,
+            isEnabled: true
+          }
+        })
+      })
     );
     expect(fetchImpl).toHaveBeenNthCalledWith(
       2,
