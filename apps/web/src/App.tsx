@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   alertDeliveries,
   demoListings,
@@ -13,6 +13,11 @@ import {
 } from "./data/demoData";
 import { filterListings, summarizeListings, type ListingFilters } from "./lib/filterListings";
 import { fetchWorkerListings, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
+import {
+  clearSupabaseAuthSession,
+  getStoredSupabaseAuthSession,
+  signInWithSupabasePassword
+} from "./lib/supabaseAuth";
 import {
   buildDemoTenantWorkflow,
   demoOrgId,
@@ -57,6 +62,16 @@ function App() {
   const [dataMode, setDataMode] = useState<"fallback" | "live">("fallback");
   const [dataMessage, setDataMessage] = useState("Se incearca incarcarea din Worker API.");
   const [isLoadingListings, setIsLoadingListings] = useState(false);
+  const [authSession, setAuthSession] = useState(getStoredSupabaseAuthSession);
+  const [authEmail, setAuthEmail] = useState(() => getStoredSupabaseAuthSession()?.email ?? "");
+  const [authPassword, setAuthPassword] = useState("");
+  const [authMessage, setAuthMessage] = useState(() => {
+    const session = getStoredSupabaseAuthSession();
+    return session?.email
+      ? `Autentificat ca ${session.email}.`
+      : "Login Supabase: foloseste access token de utilizator pentru workflow tenant.";
+  });
+  const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [workflowItems, setWorkflowItems] = useState<TenantWorkflowItem[]>(() =>
     buildDemoTenantWorkflow(demoListings, demoTenantId)
   );
@@ -117,7 +132,7 @@ function App() {
   useEffect(() => {
     let ignoreResult = false;
     const workerApiBaseUrl = resolveWorkerApiBaseUrl();
-    const accessToken = resolveTenantWorkflowAccessToken();
+    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
     const fallbackWorkflow = buildDemoTenantWorkflow(listings, demoTenantId);
 
     setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
@@ -172,11 +187,11 @@ function App() {
     return () => {
       ignoreResult = true;
     };
-  }, [listings]);
+  }, [authSession?.accessToken, listings]);
 
   const handleWorkflowStatusChange = async (item: TenantWorkflowItem, status: TenantWorkflowStatus) => {
     const workerApiBaseUrl = resolveWorkerApiBaseUrl();
-    const accessToken = resolveTenantWorkflowAccessToken();
+    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
     workflowStatusOverrides.current.set(item.listingId, status);
     setWorkflowItems((currentItems) =>
       currentItems.map((currentItem) =>
@@ -211,6 +226,34 @@ function App() {
     }
   };
 
+  const handleSupabaseLogin = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsAuthLoading(true);
+    setAuthMessage("Se autentifica prin Supabase Auth.");
+
+    try {
+      const session = await signInWithSupabasePassword({
+        email: authEmail.trim(),
+        password: authPassword
+      });
+      setAuthSession(session);
+      setAuthEmail(session.email ?? authEmail.trim());
+      setAuthPassword("");
+      setAuthMessage(`Autentificat ca ${session.email ?? authEmail.trim()}.`);
+    } catch (error) {
+      setAuthMessage(`Login esuat: ${error instanceof Error ? error.message : "Supabase Auth indisponibil"}.`);
+    } finally {
+      setIsAuthLoading(false);
+    }
+  };
+
+  const handleSupabaseLogout = () => {
+    clearSupabaseAuthSession();
+    setAuthSession(null);
+    setAuthPassword("");
+    setAuthMessage("Delogat: workflow-ul ramane in demo pana la un nou login Supabase.");
+  };
+
   return (
     <main className="app-shell">
       <aside className="sidebar" aria-label="Navigatie produs">
@@ -218,6 +261,7 @@ function App() {
         <nav>
           <a href="#search">Search</a>
           <a href="#detail">Detail</a>
+          <a href="#auth">Auth</a>
           <a href="#workflow">Workflow</a>
           <a href="#saved">Saved</a>
           <a href="#alerts">Alerts</a>
@@ -395,6 +439,54 @@ function App() {
             ) : (
               <p className="safe-note">Nu exista listinguri incarcate din API pentru detaliu.</p>
             )}
+          </section>
+
+          <section id="auth" className="panel" data-testid="supabase-auth">
+            <div className="section-heading compact">
+              <div>
+                <h2>Supabase Auth</h2>
+                <p>Login real pentru endpointurile tenant protejate de RLS.</p>
+              </div>
+              <span className="count-pill">{authSession ? "Autentificat" : "Neautentificat"}</span>
+            </div>
+            <form className="auth-form" onSubmit={handleSupabaseLogin}>
+              <label>
+                <span>Email Supabase</span>
+                <input
+                  type="email"
+                  value={authEmail}
+                  onChange={(event) => setAuthEmail(event.target.value)}
+                  placeholder="agent@agentie.ro"
+                  autoComplete="email"
+                  required
+                />
+              </label>
+              <label>
+                <span>Parola Supabase</span>
+                <input
+                  type="password"
+                  value={authPassword}
+                  onChange={(event) => setAuthPassword(event.target.value)}
+                  placeholder="Parola contului"
+                  autoComplete="current-password"
+                  required
+                />
+              </label>
+              <div className="auth-actions">
+                <button type="submit" disabled={isAuthLoading}>
+                  {isAuthLoading ? "Se autentifica" : "Login Supabase"}
+                </button>
+                <button type="button" onClick={handleSupabaseLogout} disabled={!authSession}>
+                  Logout
+                </button>
+              </div>
+            </form>
+            <p className="safe-note" role="status" aria-live="polite">
+              {authMessage}
+            </p>
+            <p className="tenant-note">
+              Frontend-ul foloseste doar cheia anon/publishable Supabase; service role ramane exclusiv in Worker.
+            </p>
           </section>
 
           <section id="workflow" className="panel" data-testid="tenant-workflow">
