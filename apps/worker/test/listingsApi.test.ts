@@ -28,7 +28,7 @@ describe("listings API", () => {
             floor: 4,
             agentName: "Agent Demo",
             phoneHash: "phone-hash",
-            searchText: "apartament 2 camere titan",
+            searchText: "internal search text with full listing content that must stay private",
             observedAt: "2026-05-25T00:00:00.000Z"
           },
           last_seen_at: "2026-05-25T00:00:00.000Z",
@@ -73,7 +73,6 @@ describe("listings API", () => {
               url: "https://example.test/listings/demo-apt-titan"
             }
           ],
-          searchText: "apartament 2 camere titan",
           observedAt: "2026-05-25T00:00:00.000Z",
           lastSeenAt: "2026-05-25T00:00:00.000Z"
         }
@@ -83,6 +82,8 @@ describe("listings API", () => {
     expect(JSON.stringify(body)).not.toContain("service-role-secret");
     expect(JSON.stringify(body)).not.toContain("Agent Demo");
     expect(JSON.stringify(body)).not.toContain("phone-hash");
+    expect(JSON.stringify(body)).not.toContain("searchText");
+    expect(JSON.stringify(body)).not.toContain("internal search text");
 
     const requestUrl = new URL(String(fetchMock.mock.calls[0]?.[0]));
     expect(requestUrl.pathname).toBe("/rest/v1/source_listings");

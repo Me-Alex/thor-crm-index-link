@@ -39,7 +39,6 @@ describe("fetchWorkerListings", () => {
       neighborhood: "titan",
       url: "https://example.test/listings/demo-apt-titan",
       sourceLinks: [{ sourceId: "demo", url: "https://example.test/listings/demo-apt-titan" }],
-      searchText: "apartament titan",
       observedAt: "2026-05-25T00:00:00.000Z",
       lastSeenAt: "2026-05-25T00:00:00.000Z"
     };

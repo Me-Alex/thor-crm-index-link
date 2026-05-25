@@ -72,7 +72,6 @@ describe("App", () => {
       neighborhood: "titan",
       url: null,
       sourceLinks: [{ sourceId: "demo", url: "https://example.test/listings/api-listing-1" }],
-      searchText: "listing live worker",
       observedAt: "2026-05-25T00:00:00.000Z",
       lastSeenAt: "2026-05-25T00:00:00.000Z"
     };
@@ -153,7 +152,6 @@ describe("App", () => {
       neighborhood: "titan",
       url: null,
       sourceLinks: [{ sourceId: "demo", url: "https://example.test/listings/api-listing-1" }],
-      searchText: "listing live worker",
       observedAt: "2026-05-25T00:00:00.000Z",
       lastSeenAt: "2026-05-25T00:00:00.000Z"
     };
@@ -289,7 +287,6 @@ describe("App", () => {
       neighborhood: "titan",
       url: "https://example.test/listings/api-listing-1",
       sourceLinks: [{ sourceId: "demo", url: "https://example.test/listings/api-listing-1" }],
-      searchText: "listing live worker",
       observedAt: "2026-05-25T00:00:00.000Z",
       lastSeenAt: "2026-05-25T00:00:00.000Z"
     };

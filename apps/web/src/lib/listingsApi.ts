@@ -67,7 +67,6 @@ interface WorkerApiListing {
     sourceId: string;
     url: string;
   }>;
-  searchText: string;
   observedAt: string | null;
   lastSeenAt: string | null;
 }

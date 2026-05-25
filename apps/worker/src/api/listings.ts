@@ -60,7 +60,6 @@ interface ApiListing {
     sourceId: string;
     url: string;
   }>;
-  searchText: string;
   observedAt: string | null;
   lastSeenAt: string | null;
 }
@@ -242,7 +241,6 @@ function mapSourceListingRow(row: SourceListingRow): ApiListing {
         url: row.url
       }
     ],
-    searchText: stringValue(payload.searchText) ?? "",
     observedAt: stringValue(payload.observedAt) ?? row.last_fetched_at ?? row.last_seen_at,
     lastSeenAt: row.last_seen_at
   };
@@ -269,7 +267,6 @@ function mapCanonicalListingRow(row: CanonicalListingRow): ApiListing {
     neighborhood: row.neighborhood,
     url: null,
     sourceLinks: [],
-    searchText: [row.title, row.description_excerpt, row.city, row.district, row.neighborhood].filter(Boolean).join(" "),
     observedAt: row.first_seen_at,
     lastSeenAt: row.last_seen_at
   };
