@@ -53,6 +53,20 @@ describe("handleRequest", () => {
     });
   });
 
+  it("reports Supabase upstream status without exposing credentials", async () => {
+    const response = await handleRequest(new Request("https://worker.test/ready"), env(), {
+      fetch: async () => Response.json({ message: "invalid key" }, { status: 401 })
+    });
+
+    expect(response.status).toBe(503);
+    await expect(response.json()).resolves.toEqual({
+      ok: false,
+      service: "thor-crm-index-link-worker",
+      supabase: "unreachable",
+      upstreamStatus: 401
+    });
+  });
+
   it("allows public read-route CORS preflight without exposing admin routes", async () => {
     const publicResponse = await handleRequest(new Request("https://worker.test/api/listings", { method: "OPTIONS" }), env());
     const adminResponse = await handleRequest(new Request("https://worker.test/admin/ingest/demo", { method: "OPTIONS" }), env());

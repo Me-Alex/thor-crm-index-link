@@ -196,7 +196,8 @@ async function readyResponse(env: Env, options: RouterOptions): Promise<Response
     return serviceUnavailable({
       ok: false,
       service: "thor-crm-index-link-worker",
-      supabase: "unreachable"
+      supabase: "unreachable",
+      upstreamStatus: response.status
     });
   }
 
