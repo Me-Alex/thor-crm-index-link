@@ -137,6 +137,8 @@ describe("fetchWorkerSourceHealth", () => {
         id: "olx",
         name: "OLX Imobiliare",
         mode: "degraded",
+        listingCount: 12,
+        latestSeenAt: "2026-05-25T11:25:50.000Z",
         crawlSuccessRate: 1,
         parseSuccessRate: 0.75,
         matchRate: 0,

@@ -275,6 +275,8 @@ function toSourceHealth(source: WorkerApiSourceHealth): SourceHealth {
     id: source.id,
     name: source.name,
     mode: source.mode,
+    listingCount: source.listingCount,
+    ...(source.latestSeenAt ? { latestSeenAt: source.latestSeenAt } : {}),
     crawlSuccessRate: source.crawlSuccessRate,
     parseSuccessRate: source.parseSuccessRate,
     matchRate: source.matchRate,
