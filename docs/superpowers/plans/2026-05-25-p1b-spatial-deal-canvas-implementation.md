@@ -2264,4 +2264,3 @@ The plan uses exact file paths, commands, expected results, and concrete code fo
 - `TenantWorkflowStatus` comes from `apps/web/src/lib/tenantWorkflowApi.ts` and is reused for inspector actions.
 - `DemoListing`, `SourceHealth`, `SavedSearch`, and `AlertDelivery` come from `apps/web/src/data/demoData.ts`.
 - `SpatialAppShell` receives existing `App.tsx` state directly and does not introduce a new backend contract.
-
