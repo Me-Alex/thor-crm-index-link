@@ -1,6 +1,7 @@
 import type { Env } from "../runtime/env";
 import { badGateway, jsonResponse, notFound } from "../http/responses";
 import type { PropertyType, TransactionType } from "../ingest/types";
+import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 
 export interface ListingsApiOptions {
   fetch?: typeof fetch;
@@ -188,11 +189,7 @@ async function querySupabaseRows<Row>(env: Env, url: URL, options: ListingsApiOp
   const fetcher = options.fetch ?? fetch;
   const response = await fetcher(url.toString(), {
     method: "GET",
-    headers: {
-      accept: "application/json",
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
-    }
+    headers: supabaseServiceHeaders(env)
   });
 
   if (!response.ok) {

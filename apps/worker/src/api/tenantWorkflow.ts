@@ -1,5 +1,6 @@
 import { badGateway, badRequest, forbidden, jsonResponse, serviceUnavailable, unauthorized } from "../http/responses";
 import type { Env } from "../runtime/env";
+import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 
 export interface TenantWorkflowApiOptions {
   fetch?: typeof fetch;
@@ -258,11 +259,9 @@ async function getAuthenticatedUserId(env: Env, options: TenantWorkflowApiOption
   ensureSupabaseConfigured(env);
   const response = await fetchWithOptions(options)(new URL("/auth/v1/user", env.SUPABASE_URL).toString(), {
     method: "GET",
-    headers: {
-      accept: "application/json",
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
+    headers: supabaseServiceHeaders(env, {
       authorization: `Bearer ${bearerToken}`
-    }
+    })
   });
 
   if (!response.ok) {
@@ -514,11 +513,7 @@ function setSearchParams(url: URL, params: Record<string, string>): void {
 }
 
 function serviceHeaders(env: Env): Record<string, string> {
-  return {
-    accept: "application/json",
-    apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-    authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
-  };
+  return Object.fromEntries(supabaseServiceHeaders(env).entries());
 }
 
 function supabaseRestUrl(env: Env, table: string): URL {

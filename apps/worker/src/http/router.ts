@@ -2,6 +2,7 @@ import { demoListingFixtureHtml } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
 import { createTenantListingNote, getTenantListingWorkflow, listTenantAlertDeliveries, updateTenantListingState } from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
+import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 import {
   apiCorsPreflight,
   jsonResponse,
@@ -188,11 +189,7 @@ async function readyResponse(env: Env, options: RouterOptions): Promise<Response
   const fetcher = options.fetch ?? fetch;
   const response = await fetcher(endpoint.toString(), {
     method: "GET",
-    headers: {
-      accept: "application/json",
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`
-    }
+    headers: supabaseServiceHeaders(env)
   });
 
   if (!response.ok) {

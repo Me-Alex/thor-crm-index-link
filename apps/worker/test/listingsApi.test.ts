@@ -88,10 +88,9 @@ describe("listings API", () => {
     expect(requestUrl.pathname).toBe("/rest/v1/source_listings");
     expect(requestUrl.searchParams.get("limit")).toBe("10");
     expect(requestUrl.searchParams.get("crawl_status")).toBe("eq.active");
-    expect(fetchMock.mock.calls[0]?.[1]?.headers).toMatchObject({
-      apikey: "service-role-secret",
-      authorization: "Bearer service-role-secret"
-    });
+    const headers = new Headers(fetchMock.mock.calls[0]?.[1]?.headers);
+    expect(headers.get("apikey")).toBe("service-role-secret");
+    expect(headers.get("authorization")).toBe("Bearer service-role-secret");
   });
 
   it("returns one listing by source listing id", async () => {

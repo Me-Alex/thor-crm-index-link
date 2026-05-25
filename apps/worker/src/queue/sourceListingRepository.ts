@@ -1,5 +1,6 @@
 import type { Env } from "../runtime/env";
 import type { NormalizedListingObservation } from "../ingest/types";
+import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 
 export interface SourceListingWrite {
   source_id: string;
@@ -30,12 +31,10 @@ export async function upsertSourceListing(
   const endpoint = `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key`;
   const response = await fetcher(endpoint, {
     method: "POST",
-    headers: {
-      apikey: env.SUPABASE_SERVICE_ROLE_KEY,
-      authorization: `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+    headers: supabaseServiceHeaders(env, {
       "content-type": "application/json",
       prefer: "resolution=merge-duplicates,return=representation"
-    },
+    }),
     body: JSON.stringify(write)
   });
 

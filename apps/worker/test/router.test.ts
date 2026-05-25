@@ -23,10 +23,9 @@ describe("handleRequest", () => {
     const response = await handleRequest(new Request("https://worker.test/ready"), env(), {
       fetch: async (input, init) => {
         expect(String(input)).toBe("https://project.supabase.co/rest/v1/sources?select=id&limit=1");
-        expect(init?.headers).toMatchObject({
-          apikey: "secret",
-          authorization: "Bearer secret"
-        });
+        const headers = new Headers(init?.headers);
+        expect(headers.get("apikey")).toBe("secret");
+        expect(headers.get("authorization")).toBe("Bearer secret");
         return Response.json([{ id: "demo" }]);
       }
     });

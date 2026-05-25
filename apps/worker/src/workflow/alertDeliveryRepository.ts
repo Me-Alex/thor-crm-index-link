@@ -2,6 +2,7 @@ import type { Env } from "../runtime/env";
 import { planAlertDeliveries } from "./alerts";
 import type { ExistingAlertDelivery, SavedSearch, SavedSearchCriteria, WorkflowListing } from "./types";
 import type { PropertyType, TransactionType } from "../ingest/types";
+import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 
 export interface AlertDeliveryRepositoryOptions {
   fetch?: typeof fetch;
@@ -232,12 +233,7 @@ async function supabaseJson<T>(
   options: AlertDeliveryRepositoryOptions
 ): Promise<T> {
   const fetcher = options.fetch ?? fetch;
-  const headers = new Headers(init.headers);
-  headers.set("apikey", env.SUPABASE_SERVICE_ROLE_KEY);
-  headers.set("authorization", `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`);
-  if (!headers.has("accept")) {
-    headers.set("accept", "application/json");
-  }
+  const headers = supabaseServiceHeaders(env, init.headers);
 
   const response = await fetcher(url.toString(), {
     ...init,
