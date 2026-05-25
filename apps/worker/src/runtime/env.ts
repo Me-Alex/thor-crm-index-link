@@ -13,6 +13,7 @@ export interface DiscoverMessage {
   sourceId: string;
   seedUrl: string;
   requestedAt: string;
+  fixtureHtml?: string;
 }
 
 export interface FetchMessage {

@@ -1,4 +1,4 @@
-export type PropertyType = "apartment" | "house" | "land" | "commercial";
+export type PropertyType = "apartment" | "house" | "land" | "commercial" | "other";
 export type TransactionType = "sale" | "rent";
 export type ListingStatus = "Nou" | "In lucru" | "Contactat" | "Ignorat";
 export type SourceMode = "on" | "degraded" | "off";

@@ -1,4 +1,5 @@
 import type { DiscoverMessage, Env, FetchMessage, MatchMessage } from "../runtime/env";
+import { handleDiscoverMessage } from "./discoverPipeline";
 import { handleFetchMessage } from "./fetchPipeline";
 
 type QueueBody = DiscoverMessage | FetchMessage | MatchMessage;
@@ -16,6 +17,11 @@ export async function handleQueueBatch(batch: MessageBatch<QueueBody>, env: Env)
 }
 
 async function handleQueueMessage(body: QueueBody, env: Env): Promise<void> {
+  if (body.kind === "discover") {
+    await handleDiscoverMessage(body, env);
+    return;
+  }
+
   if (body.kind === "fetch") {
     await handleFetchMessage(body, env);
     return;

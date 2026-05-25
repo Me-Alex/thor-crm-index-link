@@ -1,17 +1,15 @@
 import { getAdapter } from "@thor-crm/adapters";
 import { normalizeListingObservation } from "../ingest/normalization";
 import type { Env, FetchMessage } from "../runtime/env";
+import { fetchHtml, type HtmlFetchOptions } from "./httpFetch";
 import { upsertSourceListing, type SourceListingRepositoryOptions } from "./sourceListingRepository";
 
-export interface FetchPipelineOptions extends SourceListingRepositoryOptions {}
+export interface FetchPipelineOptions extends SourceListingRepositoryOptions, HtmlFetchOptions {}
 
 export async function handleFetchMessage(message: FetchMessage, env: Env, options: FetchPipelineOptions = {}): Promise<void> {
-  if (!message.fixtureHtml) {
-    throw new Error("fixture_html_required_for_mvp_fetch_pipeline");
-  }
-
+  const html = message.fixtureHtml ?? (await fetchHtml(message.url, options));
   const adapter = getAdapter(message.sourceId);
-  const parsed = adapter.parseListingDetail(message.fixtureHtml, {
+  const parsed = adapter.parseListingDetail(html, {
     sourceId: message.sourceId,
     url: message.url,
     observedAt: message.discoveredAt

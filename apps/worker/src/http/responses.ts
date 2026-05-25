@@ -8,6 +8,32 @@ export function jsonResponse(body: unknown, init: ResponseInit = {}): Response {
   });
 }
 
+export function withPublicCors(response: Response): Response {
+  const headers = new Headers(response.headers);
+  headers.set("access-control-allow-origin", "*");
+  headers.set("access-control-allow-methods", "GET, OPTIONS");
+  headers.set("access-control-allow-headers", "content-type");
+  headers.set("vary", "Origin");
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers
+  });
+}
+
+export function publicCorsPreflight(): Response {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      "access-control-allow-origin": "*",
+      "access-control-allow-methods": "GET, OPTIONS",
+      "access-control-allow-headers": "content-type",
+      vary: "Origin"
+    }
+  });
+}
+
 export function notFound(): Response {
   return jsonResponse(
     {
@@ -35,5 +61,15 @@ export function unauthorized(): Response {
       message: "Invalid admin API key"
     },
     { status: 401 }
+  );
+}
+
+export function badGateway(error: string, message: string): Response {
+  return jsonResponse(
+    {
+      error,
+      message
+    },
+    { status: 502 }
   );
 }

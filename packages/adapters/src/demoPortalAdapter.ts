@@ -1,7 +1,24 @@
-import type { ListingDetailAdapter, ListingParseResult, ParseContext } from "./types";
+import type { ListingDetailAdapter, ListingParseResult, ListingUrlParseResult, ParseContext } from "./types";
+import { demoDetailFixtureHtmlByUrl } from "./demoFixture";
 
 export const demoPortalAdapter: ListingDetailAdapter = {
   sourceId: "demo",
+  approvedSeedUrls: ["https://example.test/listings"],
+  detailFixtureHtmlByUrl: demoDetailFixtureHtmlByUrl,
+  parseListingUrls(html: string, context: ParseContext): ListingUrlParseResult {
+    const urls = [...html.matchAll(/<a\b[^>]*>/giu)]
+      .filter((match) => hasAttribute(match[0], "data-listing-link"))
+      .map((match) => extractAttributeFromTag(match[0], "href"))
+      .map((href) => toSameOriginAbsoluteUrl(href, context.url))
+      .filter((url): url is string => Boolean(url));
+
+    if (urls.length === 0) {
+      return { ok: false, errors: ["missing_listing_links"] };
+    }
+
+    return { ok: true, urls: [...new Set(urls)] };
+  },
+
   parseListingDetail(html: string, context: ParseContext): ListingParseResult {
     const sourceListingId = extractAttribute(html, "data-source-listing-id");
     const title = extractField(html, "title");
@@ -74,6 +91,17 @@ function extractAttribute(html: string, attribute: string): string | undefined {
   return decodeHtml(match?.[1]);
 }
 
+function extractAttributeFromTag(tag: string, attribute: string): string | undefined {
+  const escaped = escapeRegExp(attribute);
+  const match = tag.match(new RegExp(`\\b${escaped}\\s*=\\s*["']([^"']+)["']`, "iu"));
+  return decodeHtml(match?.[1]);
+}
+
+function hasAttribute(tag: string, attribute: string): boolean {
+  const escaped = escapeRegExp(attribute);
+  return new RegExp(`\\b${escaped}(?:\\s*=|\\s|>|/)`, "iu").test(tag);
+}
+
 function extractField(html: string, field: string): string | undefined {
   const escaped = escapeRegExp(field);
   const match = html.match(new RegExp(`<[^>]+data-field\\s*=\\s*["']${escaped}["'][^>]*>([\\s\\S]*?)<\\/[^>]+>`, "iu"));
@@ -104,4 +132,21 @@ function decodeHtml(value: string | undefined): string | undefined {
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function toSameOriginAbsoluteUrl(value: string | undefined, baseUrl: string): string | undefined {
+  if (!value) {
+    return undefined;
+  }
+
+  try {
+    const base = new URL(baseUrl);
+    const url = new URL(value, baseUrl);
+    if (url.protocol !== "http:" && url.protocol !== "https:") {
+      return undefined;
+    }
+    return url.origin === base.origin ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
 }

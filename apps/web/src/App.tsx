@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   alertDeliveries,
   demoListings,
@@ -12,6 +12,7 @@ import {
   type TransactionType
 } from "./data/demoData";
 import { filterListings, summarizeListings, type ListingFilters } from "./lib/filterListings";
+import { fetchWorkerListings, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
 
 const formatEuro = new Intl.NumberFormat("ro-RO", {
   style: "currency",
@@ -23,7 +24,8 @@ const propertyLabels: Record<PropertyType, string> = {
   apartment: "Apartament",
   house: "Casa",
   land: "Teren",
-  commercial: "Comercial"
+  commercial: "Comercial",
+  other: "Alt tip"
 };
 
 const transactionLabels: Record<TransactionType, string> = {
@@ -33,13 +35,52 @@ const transactionLabels: Record<TransactionType, string> = {
 
 function App() {
   const [filters, setFilters] = useState<ListingFilters>({});
-  const filteredListings = useMemo(() => filterListings(demoListings, filters), [filters]);
-  const summary = useMemo(() => summarizeListings(demoListings), []);
-  const selectedListing = filteredListings[0] ?? demoListings[0];
+  const [listings, setListings] = useState<DemoListing[]>(demoListings);
+  const [dataMode, setDataMode] = useState<"fallback" | "live">("fallback");
+  const [dataMessage, setDataMessage] = useState("Se incearca incarcarea din Worker API.");
+  const [isLoadingListings, setIsLoadingListings] = useState(false);
+  const filteredListings = useMemo(() => filterListings(listings, filters), [filters, listings]);
+  const summary = useMemo(() => summarizeListings(listings), [listings]);
+  const selectedListing = filteredListings[0] ?? listings[0];
 
-  if (!selectedListing) {
-    throw new Error("Demo listings are required to render the dashboard");
-  }
+  useEffect(() => {
+    let ignoreResult = false;
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+
+    if (!workerApiBaseUrl) {
+      return undefined;
+    }
+
+    setIsLoadingListings(true);
+    fetchWorkerListings({ baseUrl: workerApiBaseUrl })
+      .then((apiListings) => {
+        if (ignoreResult) {
+          return;
+        }
+
+        setListings(apiListings);
+        setDataMode("live");
+        setDataMessage("Live API: listinguri incarcate din Worker.");
+      })
+      .catch((error: unknown) => {
+        if (ignoreResult) {
+          return;
+        }
+
+        setListings(demoListings);
+        setDataMode("fallback");
+        setDataMessage(`Fallback demo: ${error instanceof Error ? error.message : "Worker API indisponibil"}.`);
+      })
+      .finally(() => {
+        if (!ignoreResult) {
+          setIsLoadingListings(false);
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, []);
 
   return (
     <main className="app-shell">
@@ -74,7 +115,7 @@ function App() {
           </div>
 
           <div className="hero-panel" aria-label="Rezumat index">
-            <Metric label="Anunturi demo" value={String(summary.total)} />
+            <Metric label={dataMode === "live" ? "Anunturi live" : "Anunturi demo"} value={String(summary.total)} />
             <Metric label="Active in workflow" value={String(summary.active)} />
             <Metric label="Scor dedup mediu" value={`${Math.round(summary.averageMatchScore * 100)}%`} />
             <Metric label="Schimbate azi" value={String(summary.changedToday)} />
@@ -82,6 +123,10 @@ function App() {
         </header>
 
         <section className="status-strip" aria-label="Linkuri publicate">
+          <span className="status-link" role="status" aria-live="polite">
+            <span>{isLoadingListings ? "Se incarca date" : dataMode === "live" ? "Live API" : "Fallback demo"}</span>
+            <strong>{dataMessage}</strong>
+          </span>
           <StatusLink label="Cloudflare Worker" href={workerHealthUrl} value="health live" />
           <StatusLink label="Supabase" href={supabaseProjectUrl} value="RLS activ" />
           <StatusLink label="GitHub" href={githubRepoUrl} value="repo privat" />
@@ -164,9 +209,17 @@ function App() {
                 <span>Status</span>
                 <span>Dedup</span>
               </div>
-              {filteredListings.map((listing) => (
-                <ListingRow key={listing.id} listing={listing} />
-              ))}
+              {filteredListings.length > 0 ? (
+                filteredListings.map((listing) => <ListingRow key={listing.id} listing={listing} />)
+              ) : (
+                <div className="table-row" role="row">
+                  <span>Nu exista listinguri pentru filtrele curente.</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                </div>
+              )}
             </div>
           </section>
 
@@ -177,35 +230,41 @@ function App() {
                 <p>Anunt canonic + linkuri sursa.</p>
               </div>
             </div>
-            <h3>{selectedListing.title}</h3>
-            <dl className="detail-list">
-              <div>
-                <dt>Localizare</dt>
-                <dd>
-                  {selectedListing.neighborhood}, {selectedListing.district}
-                </dd>
-              </div>
-              <div>
-                <dt>Pret</dt>
-                <dd>{formatEuro.format(selectedListing.priceEur)}</dd>
-              </div>
-              <div>
-                <dt>Suprafata</dt>
-                <dd>{selectedListing.areaSqm} mp</dd>
-              </div>
-              <div>
-                <dt>Agent</dt>
-                <dd>{selectedListing.assignee}</dd>
-              </div>
-            </dl>
-            <p className="safe-note">Nu re-hostam descrieri integrale sau imagini portal; pastram index + link.</p>
-            <div className="source-links">
-              {selectedListing.sources.map((source) => (
-                <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
-                  {source.name} · {Math.round(source.matchScore * 100)}%
-                </a>
-              ))}
-            </div>
+            {selectedListing ? (
+              <>
+                <h3>{selectedListing.title}</h3>
+                <dl className="detail-list">
+                  <div>
+                    <dt>Localizare</dt>
+                    <dd>
+                      {selectedListing.neighborhood}, {selectedListing.district}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Pret</dt>
+                    <dd>{formatEuro.format(selectedListing.priceEur)}</dd>
+                  </div>
+                  <div>
+                    <dt>Suprafata</dt>
+                    <dd>{selectedListing.areaSqm} mp</dd>
+                  </div>
+                  <div>
+                    <dt>Agent</dt>
+                    <dd>{selectedListing.assignee}</dd>
+                  </div>
+                </dl>
+                <p className="safe-note">Nu re-hostam descrieri integrale sau imagini portal; pastram index + link.</p>
+                <div className="source-links">
+                  {selectedListing.sources.map((source) => (
+                    <a key={source.url} href={source.url} target="_blank" rel="noreferrer">
+                      {source.name} · {Math.round(source.matchScore * 100)}%
+                    </a>
+                  ))}
+                </div>
+              </>
+            ) : (
+              <p className="safe-note">Nu exista listinguri incarcate din API pentru detaliu.</p>
+            )}
           </section>
 
           <section id="saved" className="panel">
@@ -309,7 +368,7 @@ function parseTransactionType(value: string): TransactionType | undefined {
 }
 
 function parsePropertyType(value: string): PropertyType | undefined {
-  return value === "apartment" || value === "house" || value === "land" || value === "commercial" ? value : undefined;
+  return value === "apartment" || value === "house" || value === "land" || value === "commercial" || value === "other" ? value : undefined;
 }
 
 function omitFilter<Key extends keyof ListingFilters>(filters: ListingFilters, key: Key): ListingFilters {

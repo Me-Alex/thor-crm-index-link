@@ -1,3 +1,4 @@
+import { demoSearchFixtureHtml } from "@thor-crm/adapters";
 import { handleRequest } from "./http/router";
 import type { Env, DiscoverMessage, FetchMessage, MatchMessage } from "./runtime/env";
 import { handleQueueBatch } from "./queue/handler";
@@ -22,10 +23,16 @@ async function scheduleDiscover(event: ScheduledEvent, env: Env): Promise<void> 
     return;
   }
 
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.warn("discover_skipped_missing_supabase_config", { cron: event.cron });
+    return;
+  }
+
   await env.DISCOVER_QUEUE.send({
     kind: "discover",
     sourceId: "demo",
     seedUrl: "https://example.test/listings",
-    requestedAt: new Date(event.scheduledTime).toISOString()
+    requestedAt: new Date(event.scheduledTime).toISOString(),
+    fixtureHtml: demoSearchFixtureHtml
   });
 }

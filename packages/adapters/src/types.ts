@@ -36,7 +36,20 @@ export type ListingParseResult =
       coverage: Record<string, boolean>;
     };
 
+export type ListingUrlParseResult =
+  | {
+      ok: true;
+      urls: string[];
+    }
+  | {
+      ok: false;
+      errors: string[];
+    };
+
 export interface ListingDetailAdapter {
   sourceId: string;
+  approvedSeedUrls: readonly string[];
+  detailFixtureHtmlByUrl?: Readonly<Record<string, string>>;
+  parseListingUrls(html: string, context: ParseContext): ListingUrlParseResult;
   parseListingDetail(html: string, context: ParseContext): ListingParseResult;
 }

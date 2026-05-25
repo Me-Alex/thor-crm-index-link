@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { demoListingFixtureHtml, getAdapter } from "../src";
+import { demoListingFixtureHtml, demoSearchFixtureHtml, getAdapter } from "../src";
 
 describe("demo portal adapter", () => {
   it("parses permitted fixture HTML into a raw listing observation", () => {
@@ -51,6 +51,46 @@ describe("demo portal adapter", () => {
       title: false,
       price: false,
       area: false
+    });
+  });
+
+  it("extracts detail links from permitted search fixture HTML", () => {
+    const adapter = getAdapter("demo");
+    const result = adapter.parseListingUrls(demoSearchFixtureHtml, {
+      sourceId: "demo",
+      url: "https://example.test/listings",
+      observedAt: "2026-05-25T00:00:00.000Z"
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      urls: [
+        "https://example.test/listings/demo-apt-titan",
+        "https://example.test/listings/demo-house-borhanci"
+      ]
+    });
+  });
+
+  it("extracts only same-origin detail links regardless of attribute order", () => {
+    const adapter = getAdapter("demo");
+    const result = adapter.parseListingUrls(
+      `
+      <main>
+        <a href="/listings/href-first" data-listing-link>Href first</a>
+        <a data-listing-link href="javascript:alert('x')">Ignored script URL</a>
+        <a data-listing-link href="https://evil.test/listings/stolen">Ignored off-origin URL</a>
+      </main>
+      `,
+      {
+        sourceId: "demo",
+        url: "https://example.test/listings",
+        observedAt: "2026-05-25T00:00:00.000Z"
+      }
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      urls: ["https://example.test/listings/href-first"]
     });
   });
 });

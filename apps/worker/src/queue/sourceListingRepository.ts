@@ -22,6 +22,10 @@ export async function upsertSourceListing(
   write: SourceListingWrite,
   options: SourceListingRepositoryOptions = {}
 ): Promise<void> {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("source_listing_repository_config_missing");
+  }
+
   const fetcher = options.fetch ?? fetch;
   const endpoint = `${env.SUPABASE_URL.replace(/\/$/, "")}/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key`;
   const response = await fetcher(endpoint, {

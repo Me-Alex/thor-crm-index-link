@@ -11,11 +11,21 @@ describe("handleRequest", () => {
     });
 
     expect(response.status).toBe(200);
+    expect(response.headers.get("access-control-allow-origin")).toBe("*");
     expect(await response.json()).toEqual({
       ok: true,
       service: "thor-crm-index-link-worker",
       environment: "test"
     });
+  });
+
+  it("allows public read-route CORS preflight without exposing admin routes", async () => {
+    const publicResponse = await handleRequest(new Request("https://worker.test/api/listings", { method: "OPTIONS" }), env());
+    const adminResponse = await handleRequest(new Request("https://worker.test/admin/ingest/demo", { method: "OPTIONS" }), env());
+
+    expect(publicResponse.status).toBe(204);
+    expect(publicResponse.headers.get("access-control-allow-methods")).toBe("GET, OPTIONS");
+    expect(adminResponse.status).toBe(405);
   });
 
   it("returns JSON 404 for unknown routes", async () => {

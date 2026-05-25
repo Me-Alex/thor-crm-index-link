@@ -1,6 +1,7 @@
 import { demoListingFixtureHtml } from "@thor-crm/adapters";
+import { getListingById, listListings } from "../api/listings";
 import { handleFetchMessage } from "../queue/fetchPipeline";
-import { jsonResponse, methodNotAllowed, notFound, unauthorized } from "./responses";
+import { jsonResponse, methodNotAllowed, notFound, publicCorsPreflight, unauthorized, withPublicCors } from "./responses";
 import type { Env } from "../runtime/env";
 import type { FetchPipelineOptions } from "../queue/fetchPipeline";
 
@@ -10,17 +11,46 @@ const demoFixtureUrl = "https://example.test/listings/demo-apt-titan";
 
 export async function handleRequest(request: Request, env: Env, options: RouterOptions = {}): Promise<Response> {
   const url = new URL(request.url);
+  const isPublicReadRoute = url.pathname === "/health" || url.pathname === "/api/listings" || /^\/api\/listings\/[^/]+$/.test(url.pathname);
+
+  if (request.method === "OPTIONS" && isPublicReadRoute) {
+    return publicCorsPreflight();
+  }
 
   if (url.pathname === "/health") {
     if (request.method !== "GET") {
       return methodNotAllowed();
     }
 
-    return jsonResponse({
-      ok: true,
-      service: "thor-crm-index-link-worker",
-      environment: env.ENVIRONMENT
-    });
+    return withPublicCors(
+      jsonResponse({
+        ok: true,
+        service: "thor-crm-index-link-worker",
+        environment: env.ENVIRONMENT
+      })
+    );
+  }
+
+  if (url.pathname === "/api/listings") {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    return withPublicCors(await listListings(request, env, options));
+  }
+
+  const listingDetailMatch = url.pathname.match(/^\/api\/listings\/([^/]+)$/);
+  if (listingDetailMatch) {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    const listingId = listingDetailMatch[1];
+    if (!listingId) {
+      return notFound();
+    }
+
+    return withPublicCors(await getListingById(decodeURIComponent(listingId), env, options));
   }
 
   if (url.pathname === "/admin/ingest/demo") {

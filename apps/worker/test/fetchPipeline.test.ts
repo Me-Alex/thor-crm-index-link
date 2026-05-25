@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import { demoListingFixtureHtml } from "@thor-crm/adapters";
+import { demoHouseFixtureHtml, demoListingFixtureHtml, demoSearchFixtureHtml } from "@thor-crm/adapters";
+import { handleDiscoverMessage } from "../src/queue/discoverPipeline";
 import { handleQueueBatch } from "../src/queue/handler";
 import { handleFetchMessage } from "../src/queue/fetchPipeline";
 import type { Env } from "../src/runtime/env";
@@ -58,6 +59,164 @@ describe("handleFetchMessage", () => {
         }
       }
     ]);
+  });
+
+  it("fetches approved detail HTML when no fixture is provided", async () => {
+    const calls: string[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      calls.push(String(input));
+
+      if (String(input) === "https://example.test/listings/demo-apt-titan") {
+        expect(init?.headers).toEqual({
+          "user-agent": "ThorCRMIndexLink/0.1 (+https://github.com/Me-Alex/thor-crm-index-link)"
+        });
+        return new Response(demoListingFixtureHtml, { status: 200 });
+      }
+
+      return new Response(JSON.stringify([{ id: "source-listing-id" }]), { status: 201 });
+    });
+
+    await handleFetchMessage(
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: "https://example.test/listings/demo-apt-titan",
+        discoveredAt: "2026-05-25T00:00:00.000Z"
+      },
+      env(),
+      { fetch: fetchMock }
+    );
+
+    expect(calls).toEqual([
+      "https://example.test/listings/demo-apt-titan",
+      "https://project.supabase.co/rest/v1/source_listings?on_conflict=source_id%2Csource_listing_key"
+    ]);
+  });
+
+  it("fails before database writes when Supabase write config is missing", async () => {
+    const fetchMock = vi.fn();
+
+    await expect(
+      handleFetchMessage(
+        {
+          kind: "fetch",
+          sourceId: "demo",
+          url: "https://example.test/listings/demo-apt-titan",
+          discoveredAt: "2026-05-25T00:00:00.000Z",
+          fixtureHtml: demoListingFixtureHtml
+        },
+        { ...env(), SUPABASE_URL: "", SUPABASE_SERVICE_ROLE_KEY: "" },
+        { fetch: fetchMock }
+      )
+    ).rejects.toThrow("source_listing_repository_config_missing");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("handleDiscoverMessage", () => {
+  it("fetches an approved seed URL and enqueues discovered detail links", async () => {
+    const sent: unknown[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      expect(String(input)).toBe("https://example.test/listings");
+      expect(init?.headers).toEqual({
+        "user-agent": "ThorCRMIndexLink/0.1 (+https://github.com/Me-Alex/thor-crm-index-link)"
+      });
+      return new Response(demoSearchFixtureHtml, { status: 200 });
+    });
+    const testEnv = {
+      ...env(),
+      FETCH_QUEUE: {
+        send: async (message: unknown) => {
+          sent.push(message);
+        }
+      } as Queue
+    };
+
+    await handleDiscoverMessage(
+      {
+        kind: "discover",
+        sourceId: "demo",
+        seedUrl: "https://example.test/listings",
+        requestedAt: "2026-05-25T00:00:00.000Z"
+      },
+      testEnv,
+      { fetch: fetchMock }
+    );
+
+    expect(sent).toEqual([
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: "https://example.test/listings/demo-apt-titan",
+        discoveredAt: "2026-05-25T00:00:00.000Z",
+        fixtureHtml: demoListingFixtureHtml
+      },
+      {
+        kind: "fetch",
+        sourceId: "demo",
+        url: "https://example.test/listings/demo-house-borhanci",
+        discoveredAt: "2026-05-25T00:00:00.000Z",
+        fixtureHtml: demoHouseFixtureHtml
+      }
+    ]);
+  });
+
+  it("uses provided discover fixture HTML without fetching the seed URL", async () => {
+    const sent: unknown[] = [];
+    const fetchMock = vi.fn();
+    const testEnv = {
+      ...env(),
+      FETCH_QUEUE: {
+        send: async (message: unknown) => {
+          sent.push(message);
+        }
+      } as Queue
+    };
+
+    await handleDiscoverMessage(
+      {
+        kind: "discover",
+        sourceId: "demo",
+        seedUrl: "https://example.test/listings",
+        requestedAt: "2026-05-25T00:00:00.000Z",
+        fixtureHtml: demoSearchFixtureHtml
+      },
+      testEnv,
+      { fetch: fetchMock }
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sent).toHaveLength(2);
+  });
+
+  it("rejects unapproved seed URLs before fetching or enqueueing links", async () => {
+    const sent: unknown[] = [];
+    const fetchMock = vi.fn(async () => new Response(demoSearchFixtureHtml, { status: 200 }));
+    const testEnv = {
+      ...env(),
+      FETCH_QUEUE: {
+        send: async (message: unknown) => {
+          sent.push(message);
+        }
+      } as Queue
+    };
+
+    await expect(
+      handleDiscoverMessage(
+        {
+          kind: "discover",
+          sourceId: "demo",
+          seedUrl: "https://unapproved.example.test/listings",
+          requestedAt: "2026-05-25T00:00:00.000Z"
+        },
+        testEnv,
+        { fetch: fetchMock }
+      )
+    ).rejects.toThrow("unapproved_seed_url");
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
   });
 });
 
