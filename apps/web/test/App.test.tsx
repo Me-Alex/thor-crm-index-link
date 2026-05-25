@@ -129,6 +129,113 @@ describe("App", () => {
     );
   });
 
+  it("logs in with Supabase Auth and uses the user token for tenant workflow", async () => {
+    vi.stubEnv("VITE_SUPABASE_URL", "https://project.supabase.co");
+    vi.stubEnv("VITE_SUPABASE_ANON_KEY", "anon-key");
+    vi.stubEnv("VITE_WORKER_API_URL", "https://worker.example.dev");
+    const apiListing = {
+      id: "33333333-3333-4333-8333-333333333333",
+      recordType: "canonical_listing",
+      sourceId: "demo",
+      sourceListingKey: "api-listing-1",
+      sourceListingId: "api-listing-1",
+      canonicalListingId: "33333333-3333-4333-8333-333333333333",
+      title: "Listing live din Worker",
+      descriptionExcerpt: "Text scurt pentru index + link.",
+      priceEur: 101000,
+      areaSqm: 54,
+      rooms: 2,
+      floor: 4,
+      propertyType: "apartment",
+      transactionType: "sale",
+      city: "bucuresti",
+      district: "sector 3",
+      neighborhood: "titan",
+      url: null,
+      sourceLinks: [{ sourceId: "demo", url: "https://example.test/listings/api-listing-1" }],
+      searchText: "listing live worker",
+      observedAt: "2026-05-25T00:00:00.000Z",
+      lastSeenAt: "2026-05-25T00:00:00.000Z"
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+
+      if (url === "https://project.supabase.co/auth/v1/token?grant_type=password") {
+        const headers = new Headers(init?.headers);
+        expect(headers.get("apikey")).toBe("anon-key");
+        expect(headers.get("authorization")).toBeNull();
+        return new Response(
+          JSON.stringify({
+            access_token: "user-token",
+            user: { email: "agent@thor.test" }
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      if (url === "https://worker.example.dev/api/listings") {
+        return new Response(JSON.stringify({ data: [apiListing], count: 1 }), {
+          status: 200,
+          headers: { "content-type": "application/json" }
+        });
+      }
+
+      if (
+        url ===
+        `https://worker.example.dev/api/orgs/${demoOrgId}/listings/33333333-3333-4333-8333-333333333333/workflow`
+      ) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              state: {
+                status: "contacted",
+                assigneeUserId: "Mara",
+                lastSeenByOrgAt: "2026-05-25T09:00:00.000Z",
+                updatedAt: "2026-05-25T10:00:00.000Z"
+              },
+              tags: [],
+              notes: []
+            }
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    render(<App />);
+
+    fireEvent.change(screen.getByLabelText(/Email Supabase/i), {
+      target: { value: "agent@thor.test" }
+    });
+    fireEvent.change(screen.getByLabelText(/Parola Supabase/i), {
+      target: { value: "password" }
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Login Supabase/i }));
+
+    expect(await screen.findByText(/Autentificat ca agent@thor.test/i)).toBeInTheDocument();
+    const workflow = screen.getByTestId("tenant-workflow");
+    expect((await within(workflow).findAllByText(/Workflow live/i)).length).toBeGreaterThan(0);
+    expect(window.sessionStorage.getItem(tenantWorkflowAccessTokenStorageKey)).toBe("user-token");
+    await waitFor(() =>
+      expect(fetchSpy).toHaveBeenCalledWith(
+        `https://worker.example.dev/api/orgs/${demoOrgId}/listings/33333333-3333-4333-8333-333333333333/workflow`,
+        expect.objectContaining({
+          headers: expect.objectContaining({
+            authorization: "Bearer user-token"
+          })
+        })
+      )
+    );
+  });
+
   it("keeps demo workflow usable when backend writes are unavailable", async () => {
     vi.stubEnv("VITE_WORKER_API_URL", "https://worker.example.dev");
     window.sessionStorage.setItem(tenantWorkflowAccessTokenStorageKey, "user-token");
@@ -225,5 +332,44 @@ describe("App", () => {
 
     expect(screen.queryByText("Garsoniere Brasov actualizat")).not.toBeInTheDocument();
     expect(screen.getByText(/Cautare stearsa/i)).toBeInTheDocument();
+  });
+
+  it("renders live source health cards when the Worker API returns operational metrics", async () => {
+    vi.stubEnv("VITE_WORKER_API_URL", "https://worker.example.dev");
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+
+      if (url === "https://worker.example.dev/api/source-health") {
+        return new Response(
+          JSON.stringify({
+            data: [
+              {
+                id: "portal-live",
+                name: "Portal Live Health",
+                mode: "on",
+                listingCount: 42,
+                latestSeenAt: "2026-05-25T11:25:50.000Z",
+                crawlSuccessRate: 1,
+                parseSuccessRate: 0.8,
+                matchRate: 0,
+                timeToIndexMinutes: 3
+              }
+            ],
+            count: 1
+          }),
+          {
+            status: 200,
+            headers: { "content-type": "application/json" }
+          }
+        );
+      }
+
+      return new Response("unavailable", { status: 404 });
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Portal Live Health")).toBeInTheDocument();
+    expect(screen.getByText("80%")).toBeInTheDocument();
   });
 });

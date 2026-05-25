@@ -1,4 +1,13 @@
-import { workerHealthUrl, type DemoListing, type ListingStatus, type PropertyType, type SourceLink, type TransactionType } from "../data/demoData";
+import {
+  workerHealthUrl,
+  type DemoListing,
+  type ListingStatus,
+  type PropertyType,
+  type SourceHealth,
+  type SourceLink,
+  type SourceMode,
+  type TransactionType
+} from "../data/demoData";
 
 export class ListingsApiError extends Error {
   constructor(message: string) {
@@ -16,6 +25,23 @@ export interface FetchWorkerListingsOptions {
 interface WorkerListingsResponse {
   data: WorkerApiListing[];
   count: number;
+}
+
+interface WorkerSourceHealthResponse {
+  data: WorkerApiSourceHealth[];
+  count: number;
+}
+
+interface WorkerApiSourceHealth {
+  id: string;
+  name: string;
+  mode: SourceMode;
+  listingCount: number;
+  latestSeenAt: string | null;
+  crawlSuccessRate: number;
+  parseSuccessRate: number;
+  matchRate: number;
+  timeToIndexMinutes: number;
 }
 
 interface WorkerApiListing {
@@ -72,6 +98,15 @@ export async function fetchWorkerHealth(
   }
 
   return payload;
+}
+
+export async function fetchWorkerSourceHealth(options: FetchWorkerListingsOptions = {}): Promise<SourceHealth[]> {
+  const payload = await fetchWorkerJson("/api/source-health", options);
+  if (!isWorkerSourceHealthResponse(payload)) {
+    throw new ListingsApiError("Worker source health API returned an invalid payload");
+  }
+
+  return payload.data.map(toSourceHealth);
 }
 
 async function fetchWorkerJson(path: string, options: FetchWorkerListingsOptions): Promise<unknown> {
@@ -143,6 +178,30 @@ function isWorkerApiListingLike(listing: unknown): listing is WorkerApiListing {
   );
 }
 
+function isWorkerSourceHealthResponse(payload: unknown): payload is WorkerSourceHealthResponse {
+  return (
+    isRecord(payload) &&
+    Array.isArray(payload.data) &&
+    payload.data.every(isWorkerApiSourceHealthLike) &&
+    typeof payload.count === "number"
+  );
+}
+
+function isWorkerApiSourceHealthLike(source: unknown): source is WorkerApiSourceHealth {
+  return (
+    isRecord(source) &&
+    typeof source.id === "string" &&
+    typeof source.name === "string" &&
+    isSourceMode(source.mode) &&
+    typeof source.listingCount === "number" &&
+    (source.latestSeenAt === null || typeof source.latestSeenAt === "string") &&
+    typeof source.crawlSuccessRate === "number" &&
+    typeof source.parseSuccessRate === "number" &&
+    typeof source.matchRate === "number" &&
+    typeof source.timeToIndexMinutes === "number"
+  );
+}
+
 function isSourceLinkLike(source: unknown): boolean {
   return (
     isRecord(source) &&
@@ -157,6 +216,10 @@ function isPropertyType(value: unknown): value is PropertyType {
 
 function isTransactionType(value: unknown): value is TransactionType {
   return value === "sale" || value === "rent";
+}
+
+function isSourceMode(value: unknown): value is SourceMode {
+  return value === "on" || value === "degraded" || value === "off";
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -206,6 +269,18 @@ function toSourceLinks(listing: WorkerApiListing): SourceLink[] {
 
 function sourceName(sourceId: string): string {
   return sourceId === "demo" ? "Demo Source" : sourceId;
+}
+
+function toSourceHealth(source: WorkerApiSourceHealth): SourceHealth {
+  return {
+    id: source.id,
+    name: source.name,
+    mode: source.mode,
+    crawlSuccessRate: source.crawlSuccessRate,
+    parseSuccessRate: source.parseSuccessRate,
+    matchRate: source.matchRate,
+    timeToIndexMinutes: source.timeToIndexMinutes
+  };
 }
 
 function tenantStatusFromApi(listing: WorkerApiListing): ListingStatus {

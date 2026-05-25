@@ -419,13 +419,15 @@ h3 {
   justify-content: flex-start;
 }
 
-.saved-search-form {
+.saved-search-form,
+.auth-form {
   display: grid;
   gap: 10px;
   margin-bottom: 12px;
 }
 
-.saved-search-form label {
+.saved-search-form label,
+.auth-form label {
   display: grid;
   gap: 6px;
   color: #64748b;
@@ -434,7 +436,8 @@ h3 {
 }
 
 .saved-search-form input,
-.saved-search-form select {
+.saved-search-form select,
+.auth-form input {
   min-height: 42px;
   padding: 0 14px;
   color: #0f172a;
@@ -443,7 +446,8 @@ h3 {
   background: #ffffff;
 }
 
-.inline-actions {
+.inline-actions,
+.auth-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -451,7 +455,8 @@ h3 {
 
 .workflow-actions button,
 .saved-search-form button,
-.inline-actions button {
+.inline-actions button,
+.auth-actions button {
   min-height: 34px;
   padding: 0 12px;
   color: #0f172a;
@@ -461,6 +466,11 @@ h3 {
   border-radius: 999px;
   background: #f0f9ff;
   cursor: pointer;
+}
+
+.auth-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
 }
 
 .mini-card em {
