@@ -1,8 +1,9 @@
-import { demoListingFixtureHtml } from "@thor-crm/adapters";
+import { demoListingFixtureHtml, sourceRegistry } from "@thor-crm/adapters";
+import type { SourceRegistryEntry } from "@thor-crm/adapters";
 import { getListingById, listListings } from "../api/listings";
 import { createTenantListingNote, getTenantListingWorkflow, listTenantAlertDeliveries, updateTenantListingState } from "../api/tenantWorkflow";
 import { handleFetchMessage } from "../queue/fetchPipeline";
-import { upsertSource } from "../queue/sourceRepository";
+import { upsertSource, type SourceWrite } from "../queue/sourceRepository";
 import { supabaseServiceHeaders } from "../runtime/supabaseRest";
 import {
   apiCorsPreflight,
@@ -190,7 +191,40 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     });
   }
 
+  if (url.pathname === "/admin/sources/bootstrap") {
+    if (request.method !== "POST") {
+      return methodNotAllowed();
+    }
+
+    if (!isAuthorizedAdmin(request, env.ADMIN_API_KEY)) {
+      return unauthorized();
+    }
+
+    for (const source of sourceRegistry) {
+      await upsertSource(env, sourceRegistryEntryToWrite(source), options);
+    }
+
+    return jsonResponse({
+      ok: true,
+      sourceCount: sourceRegistry.length,
+      status: "source_registry_bootstrapped"
+    });
+  }
+
   return notFound();
+}
+
+function sourceRegistryEntryToWrite(source: SourceRegistryEntry): SourceWrite {
+  return {
+    id: source.id,
+    name: source.name,
+    base_url: source.baseUrl,
+    robots_policy_url: source.robotsPolicyUrl,
+    mode: source.mode,
+    rate_limit_per_minute: source.rateLimitPerMinute,
+    crawl_config: source.crawlConfig,
+    source_trust: source.sourceTrust
+  };
 }
 
 async function readyResponse(env: Env, options: RouterOptions): Promise<Response> {

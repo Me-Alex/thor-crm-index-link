@@ -11,6 +11,10 @@ export async function handleQueueBatch(batch: MessageBatch<QueueBody>, env: Env)
       message.ack();
     } catch (error) {
       console.error("queue_message_failed", { id: message.id, error: error instanceof Error ? error.message : String(error) });
+      if (isPermanentQueueError(error)) {
+        message.ack();
+        continue;
+      }
       message.retry();
     }
   }
@@ -28,4 +32,14 @@ async function handleQueueMessage(body: QueueBody, env: Env): Promise<void> {
   }
 
   console.log("queue_message_skipped", { kind: body.kind });
+}
+
+function isPermanentQueueError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  return (
+    message === "html_fetch_too_large" ||
+    message.startsWith("listing_parse_failed:") ||
+    message === "unapproved_seed_url" ||
+    message.startsWith("robots_disallowed_seed_url:")
+  );
 }

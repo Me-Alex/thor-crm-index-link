@@ -53,6 +53,20 @@ The crawler must use:
 - dead-letter handling for repeated failures;
 - a fast source disable path.
 
+## Crawler MVP implemented
+
+The current crawler implementation supports a controlled source registry for Romanian real-estate portals:
+
+- `imobiliare`, `storia`, `olx`, `publi24`, `romimo`, `homezz`, `anuntul`, `lajumate`.
+- `imobiliare` is the only source enabled for initial live crawl; the other real portal sources stay `mode = off`, `allowLiveCrawl = false`, and `reviewStatus = pending_review`.
+- Discovery checks source status before network access and skips inactive sources without fetching.
+- Active reviewed sources must pass `robots.txt` policy before fetching a sitemap or listing seed URL.
+- Sitemap discovery only keeps same-origin HTTP(S) URLs and caps the number of discovered links.
+- Generic JSON-LD parsing extracts only normalized index fields: title, description excerpt, price, area, rooms, location, property type, transaction type, and source URL.
+- Tests use local fixtures and mocked fetch calls; CI must not crawl real portal pages.
+
+Turning any additional real portal `on` requires policy/legal review, adapter validation on fixtures, and an explicit production change. Do not activate all sources at once.
+
 ## PII and retention
 
 Listing data can contain personal data such as names, phone numbers, agency names, or free-text descriptions. The system must:

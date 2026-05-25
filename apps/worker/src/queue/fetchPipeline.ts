@@ -1,4 +1,4 @@
-import { getAdapter } from "@thor-crm/adapters";
+import { getAdapter, getSourceRegistryEntry } from "@thor-crm/adapters";
 import { normalizeListingObservation } from "../ingest/normalization";
 import type { NormalizedListingObservation } from "../ingest/types";
 import type { Env, FetchMessage } from "../runtime/env";
@@ -15,7 +15,10 @@ export interface FetchPipelineOptions
     HtmlFetchOptions {}
 
 export async function handleFetchMessage(message: FetchMessage, env: Env, options: FetchPipelineOptions = {}): Promise<void> {
-  const html = message.fixtureHtml ?? (await fetchHtml(message.url, options));
+  const source = getSourceRegistryEntry(message.sourceId);
+  const maxBytes = source?.crawlConfig.maxDetailBytes ?? options.maxBytes;
+  const fetchOptions = maxBytes === undefined ? options : { ...options, maxBytes };
+  const html = message.fixtureHtml ?? (await fetchHtml(message.url, fetchOptions));
   const adapter = getAdapter(message.sourceId);
   const parsed = adapter.parseListingDetail(html, {
     sourceId: message.sourceId,

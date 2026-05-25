@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { sourceRegistry } from "@thor-crm/adapters";
 import { handleRequest } from "../src/http/router";
 
 describe("handleRequest", () => {
@@ -164,6 +165,60 @@ describe("handleRequest", () => {
         id: "demo",
         name: "Demo Source",
         base_url: "https://example.test"
+      }
+    });
+  });
+
+  it("bootstraps registered Romanian source policies with only imobiliare active", async () => {
+    const writes: unknown[] = [];
+    const response = await handleRequest(
+      new Request("https://worker.test/admin/sources/bootstrap", {
+        method: "POST",
+        headers: {
+          "x-admin-api-key": "admin"
+        }
+      }),
+      env(),
+      {
+        fetch: async (input, init) => {
+          writes.push({
+            url: String(input),
+            method: init?.method,
+            body: init?.body ? JSON.parse(String(init.body)) : undefined
+          });
+          return new Response(null, { status: 201 });
+        }
+      }
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      ok: true,
+      sourceCount: sourceRegistry.length,
+      status: "source_registry_bootstrapped"
+    });
+    expect(writes).toHaveLength(sourceRegistry.length);
+    expect(writes.every((write) => String((write as { url: string }).url).endsWith("/rest/v1/sources?on_conflict=id"))).toBe(true);
+    expect(writes.find((write) => (write as { body: { id: string } }).body.id === "imobiliare")).toMatchObject({
+      method: "POST",
+      body: {
+        id: "imobiliare",
+        mode: "on",
+        crawl_config: expect.objectContaining({
+          reviewStatus: "approved_initial_crawl",
+          rehostPolicy: "index_link_only",
+          allowLiveCrawl: true
+        })
+      }
+    });
+    expect(writes.find((write) => (write as { body: { id: string } }).body.id === "olx")).toMatchObject({
+      body: {
+        id: "olx",
+        mode: "off",
+        crawl_config: expect.objectContaining({
+          reviewStatus: "pending_review",
+          allowLiveCrawl: false
+        })
       }
     });
   });

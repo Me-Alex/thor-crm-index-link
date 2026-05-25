@@ -1,9 +1,13 @@
-import { getAdapter } from "@thor-crm/adapters";
-import type { ListingDetailAdapter } from "@thor-crm/adapters";
+import { getAdapter, getSourceRegistryEntry } from "@thor-crm/adapters";
+import type { ListingDetailAdapter, SourceRegistryEntry } from "@thor-crm/adapters";
+import { isRobotsAllowed, parseRobotsTxt } from "../crawler/robots";
+import { parseSitemapUrls } from "../crawler/sitemap";
 import type { DiscoverMessage, Env, FetchMessage } from "../runtime/env";
-import { fetchHtml, type HtmlFetchOptions } from "./httpFetch";
+import { crawlerUserAgent, fetchHtml, type HtmlFetchOptions } from "./httpFetch";
 
-export interface DiscoverPipelineOptions extends HtmlFetchOptions {}
+export interface DiscoverPipelineOptions extends HtmlFetchOptions {
+  sourceLookup?: (sourceId: string) => SourceRegistryEntry | undefined;
+}
 
 export async function handleDiscoverMessage(
   message: DiscoverMessage,
@@ -14,10 +18,25 @@ export async function handleDiscoverMessage(
     throw new Error("fetch_queue_missing");
   }
 
+  const source = (options.sourceLookup ?? getSourceRegistryEntry)(message.sourceId);
+  if (source && source.id !== "demo" && (source.mode !== "on" || !source.crawlConfig.allowLiveCrawl)) {
+    console.warn("discover_skipped_source_inactive", {
+      sourceId: source.id,
+      mode: source.mode,
+      reviewStatus: source.crawlConfig.reviewStatus,
+      allowLiveCrawl: source.crawlConfig.allowLiveCrawl
+    });
+    return;
+  }
+
   const adapter = getAdapter(message.sourceId);
   assertApprovedSeedUrl(message.seedUrl, adapter);
 
-  const html = message.fixtureHtml ?? (await fetchHtml(message.seedUrl, options));
+  if (source && source.id !== "demo") {
+    await assertRobotsAllowed(source, message.seedUrl, options);
+  }
+
+  const html = await discoverSeedBody(message, source, options);
   const parsed = adapter.parseListingUrls(html, {
     sourceId: message.sourceId,
     url: message.seedUrl,
@@ -38,6 +57,30 @@ export async function handleDiscoverMessage(
       ...(fixtureHtml ? { fixtureHtml } : {})
     };
     await env.FETCH_QUEUE.send(fetchMessage);
+  }
+}
+
+async function discoverSeedBody(message: DiscoverMessage, source: SourceRegistryEntry | undefined, options: DiscoverPipelineOptions): Promise<string> {
+  const maxBytes = source?.crawlConfig.maxSitemapBytes ?? options.maxBytes;
+  const fetchOptions = maxBytes === undefined ? options : { ...options, maxBytes };
+  const body = message.fixtureHtml ?? (await fetchHtml(message.seedUrl, fetchOptions));
+  if (!source || source.crawlConfig.crawlStrategy !== "sitemap") {
+    return body;
+  }
+
+  const urls = parseSitemapUrls(body, {
+    baseUrl: source.baseUrl,
+    limit: source.crawlConfig.maxDiscoverUrls
+  });
+  return `<urlset>${urls.map((url) => `<url><loc>${escapeXml(url)}</loc></url>`).join("")}</urlset>`;
+}
+
+async function assertRobotsAllowed(source: SourceRegistryEntry, seedUrl: string, options: DiscoverPipelineOptions): Promise<void> {
+  const robotsTxt = await fetchHtml(source.robotsPolicyUrl, options);
+  const policy = parseRobotsTxt(robotsTxt);
+  const decision = isRobotsAllowed(policy, crawlerUserAgent, seedUrl);
+  if (!decision.allowed) {
+    throw new Error(`robots_disallowed_seed_url:${decision.matchedRule ?? "unknown"}`);
   }
 }
 
@@ -63,4 +106,8 @@ function normalizeCrawlUrl(value: string): string {
   }
 
   return url.toString();
+}
+
+function escapeXml(value: string): string {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }

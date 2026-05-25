@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { demoHouseFixtureHtml, demoListingFixtureHtml, demoSearchFixtureHtml } from "@thor-crm/adapters";
+import { demoHouseFixtureHtml, demoListingFixtureHtml, demoSearchFixtureHtml, getSourceRegistryEntry } from "@thor-crm/adapters";
 import { handleDiscoverMessage } from "../src/queue/discoverPipeline";
 import { handleQueueBatch } from "../src/queue/handler";
 import { handleFetchMessage } from "../src/queue/fetchPipeline";
@@ -369,6 +369,33 @@ describe("handleFetchMessage", () => {
 });
 
 describe("handleDiscoverMessage", () => {
+  it("skips disabled registered real sources before fetching or enqueueing links", async () => {
+    const sent: unknown[] = [];
+    const fetchMock = vi.fn();
+    const testEnv = {
+      ...env(),
+      FETCH_QUEUE: {
+        send: async (message: unknown) => {
+          sent.push(message);
+        }
+      } as Queue
+    };
+
+    await handleDiscoverMessage(
+      {
+        kind: "discover",
+        sourceId: "olx",
+        seedUrl: "https://www.olx.ro/sitemap.xml",
+        requestedAt: "2026-05-25T00:00:00.000Z"
+      },
+      testEnv,
+      { fetch: fetchMock }
+    );
+
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(sent).toEqual([]);
+  });
+
   it("fetches an approved seed URL and enqueues discovered detail links", async () => {
     const sent: unknown[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
@@ -444,6 +471,72 @@ describe("handleDiscoverMessage", () => {
     expect(sent).toHaveLength(2);
   });
 
+  it("checks robots policy before parsing an active registry sitemap", async () => {
+    const source = getSourceRegistryEntry("imobiliare");
+    if (!source) {
+      throw new Error("missing_test_source");
+    }
+
+    const sent: unknown[] = [];
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      if (String(input) === "https://www.imobiliare.ro/robots.txt") {
+        return new Response("User-agent: *\nAllow: /sitemap-listings-apartments-for-rent-bucuresti-ro.xml\n", { status: 200 });
+      }
+      if (String(input) === "https://www.imobiliare.ro/sitemap-listings-apartments-for-rent-bucuresti-ro.xml") {
+        return new Response(
+          `<urlset>
+            <url><loc>https://www.imobiliare.ro/oferta/apartament-de-inchiriat-sector-1-herastrau-mobilat-2-camere-216333556</loc></url>
+            <url><loc>https://www.imobiliare.ro/blog/piata-imobiliara</loc></url>
+          </urlset>`,
+          { status: 200 }
+        );
+      }
+      throw new Error(`unexpected_fetch:${String(input)}`);
+    });
+    const testEnv = {
+      ...env(),
+      FETCH_QUEUE: {
+        send: async (message: unknown) => {
+          sent.push(message);
+        }
+      } as Queue
+    };
+
+    await handleDiscoverMessage(
+      {
+        kind: "discover",
+        sourceId: "imobiliare",
+        seedUrl: "https://www.imobiliare.ro/sitemap-listings-apartments-for-rent-bucuresti-ro.xml",
+        requestedAt: "2026-05-25T00:00:00.000Z"
+      },
+      testEnv,
+      {
+        fetch: fetchMock,
+        sourceLookup: (sourceId) =>
+          sourceId === "imobiliare"
+            ? {
+                ...source,
+                mode: "on",
+                crawlConfig: {
+                  ...source.crawlConfig,
+                  allowLiveCrawl: true
+                }
+              }
+            : getSourceRegistryEntry(sourceId)
+      }
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(sent).toEqual([
+      {
+        kind: "fetch",
+        sourceId: "imobiliare",
+        url: "https://www.imobiliare.ro/oferta/apartament-de-inchiriat-sector-1-herastrau-mobilat-2-camere-216333556",
+        discoveredAt: "2026-05-25T00:00:00.000Z"
+      }
+    ]);
+  });
+
   it("rejects unapproved seed URLs before fetching or enqueueing links", async () => {
     const sent: unknown[] = [];
     const fetchMock = vi.fn(async () => new Response(demoSearchFixtureHtml, { status: 200 }));
@@ -475,6 +568,40 @@ describe("handleDiscoverMessage", () => {
 });
 
 describe("handleQueueBatch", () => {
+  it("acks permanent fetch failures instead of retrying poison messages", async () => {
+    const originalFetch = globalThis.fetch;
+    const fetchMock = vi.fn(async () => new Response("x".repeat(1_000_001), { headers: { "content-length": "1000001" } }));
+    const ack = vi.fn();
+    const retry = vi.fn();
+    globalThis.fetch = fetchMock as typeof fetch;
+
+    try {
+      await handleQueueBatch(
+        {
+          messages: [
+            {
+              id: "message-too-large",
+              body: {
+                kind: "fetch",
+                sourceId: "demo",
+                url: "https://example.test/listings/demo-apt-titan",
+                discoveredAt: "2026-05-25T00:00:00.000Z"
+              },
+              ack,
+              retry
+            }
+          ]
+        } as unknown as MessageBatch,
+        env()
+      );
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+
+    expect(ack).toHaveBeenCalledOnce();
+    expect(retry).not.toHaveBeenCalled();
+  });
+
   it("acks fetch messages after the fixture pipeline persists them", async () => {
     const originalFetch = globalThis.fetch;
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {

@@ -86,6 +86,36 @@ Acest endpoint:
 - face upsert în `source_listings` prin Supabase REST, server-side;
 - necesită `ADMIN_API_KEY`.
 
+### Source registry bootstrap
+
+Endpointul operațional pentru sincronizarea registrului de surse în Supabase este:
+
+```bash
+curl -X POST \
+  -H "x-admin-api-key: <ADMIN_API_KEY>" \
+  https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/admin/sources/bootstrap
+```
+
+Acest endpoint:
+
+- inserează sau actualizează sursele din registry în `public.sources`;
+- nu pornește crawling real;
+- păstrează portalurile reale neactivate pe `mode = off` și `allowLiveCrawl = false`;
+- este pasul corect înainte de review operațional, fixture tests și activare graduală.
+
+Sursele reale incluse în registry sunt:
+
+- `imobiliare`
+- `storia`
+- `olx`
+- `publi24`
+- `romimo`
+- `homezz`
+- `anuntul`
+- `lajumate`
+
+`imobiliare` este activat pentru crawl inițial controlat. Pentru orice altă activare reală, modifică o singură sursă pe rând după review, setează `mode = on` și `allowLiveCrawl = true` printr-un PR auditat, apoi verifică logs, queue backlog, parse coverage și match rate.
+
 ## Cloudflare Pages
 
 Frontend-ul este publicat la:

@@ -1,4 +1,5 @@
-import { demoSearchFixtureHtml } from "@thor-crm/adapters";
+import { demoSearchFixtureHtml, sourceRegistry } from "@thor-crm/adapters";
+import { buildScheduledDiscoverMessages } from "./crawler/scheduler";
 import { handleRequest } from "./http/router";
 import type { Env, DiscoverMessage, FetchMessage, MatchMessage } from "./runtime/env";
 import { handleQueueBatch } from "./queue/handler";
@@ -28,11 +29,16 @@ async function scheduleDiscover(event: ScheduledEvent, env: Env): Promise<void> 
     return;
   }
 
+  const requestedAt = new Date(event.scheduledTime).toISOString();
   await env.DISCOVER_QUEUE.send({
     kind: "discover",
     sourceId: "demo",
     seedUrl: "https://example.test/listings",
-    requestedAt: new Date(event.scheduledTime).toISOString(),
+    requestedAt,
     fixtureHtml: demoSearchFixtureHtml
   });
+
+  for (const message of buildScheduledDiscoverMessages(sourceRegistry, requestedAt)) {
+    await env.DISCOVER_QUEUE.send(message);
+  }
 }

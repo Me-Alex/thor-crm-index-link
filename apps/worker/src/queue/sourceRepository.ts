@@ -8,7 +8,7 @@ export interface SourceWrite {
   robots_policy_url: string | null;
   mode: "on" | "degraded" | "off";
   rate_limit_per_minute: number;
-  crawl_config: Record<string, unknown>;
+  crawl_config: unknown;
   source_trust: number;
 }
 
