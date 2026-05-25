@@ -10,41 +10,41 @@ describe("App", () => {
     window.sessionStorage.clear();
   });
 
-  it("renders the P1B spatial deal canvas as the primary web surface", async () => {
+  it("renders Thor Market Radar as the primary web surface", async () => {
     render(<App />);
 
-    expect(await screen.findByText(/Thor Spatial/i)).toBeInTheDocument();
-    expect(screen.getByTestId("spatial-canvas")).toBeInTheDocument();
-    expect(screen.getByTestId("node-inspector")).toBeInTheDocument();
-    expect(screen.getByLabelText(/Command search/i)).toBeInTheDocument();
+    expect(await screen.findByText(/THOR CRM/i)).toBeInTheDocument();
+    expect(screen.getByTestId("market-radar-shell")).toBeInTheDocument();
+    expect(screen.getByTestId("market-radar-map")).toBeInTheDocument();
+    expect(screen.getByTestId("selected-listing-drawer")).toBeInTheDocument();
+    expect(screen.getByLabelText(/Cauta anunturi, zone, surse/i)).toBeInTheDocument();
     expect(screen.getByTestId("supabase-auth")).toBeInTheDocument();
     expect(screen.getByTestId("saved-searches")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: /^Search$/i })).not.toBeInTheDocument();
   });
 
-  it("shows demo-safe index plus link source URLs in the spatial inspector", async () => {
+  it("shows demo-safe index plus link source URLs in the selected drawer", async () => {
     render(<App />);
 
-    const inspector = await screen.findByTestId("node-inspector");
-    expect(within(inspector).getByText("Apartament 2 camere Titan")).toBeInTheDocument();
-    expect(within(inspector).getByRole("link", { name: /Open source · imobiliare.ro/i })).toHaveAttribute(
+    const drawer = await screen.findByTestId("selected-listing-drawer");
+    expect(within(drawer).getAllByText("Apartament 2 camere Titan").length).toBeGreaterThan(0);
+    expect(within(drawer).getByRole("link", { name: /Open source · imobiliare.ro/i })).toHaveAttribute(
       "href",
       "https://example.test/imobiliare/titan-2-camere"
     );
-    expect(within(inspector).getAllByText(/Index \+ link/i).length).toBeGreaterThan(0);
-    expect(within(inspector).queryByText(/Text scurt pentru index/i)).not.toBeInTheDocument();
+    expect(within(drawer).getByText(/Index \+ link/i)).toBeInTheDocument();
+    expect(within(drawer).queryByText(/Text scurt pentru index/i)).not.toBeInTheDocument();
   });
 
-  it("filters listing nodes through command search", async () => {
+  it("filters hot opportunities through command search", async () => {
     render(<App />);
 
-    fireEvent.change(await screen.findByLabelText(/Command search/i), {
+    fireEvent.change(await screen.findByLabelText(/Cauta anunturi, zone, surse/i), {
       target: { value: "herastrau" }
     });
 
-    const canvas = screen.getByTestId("spatial-canvas");
-    expect(within(canvas).getByRole("button", { name: "Studio premium Herastrau" })).toBeInTheDocument();
-    expect(within(canvas).queryByRole("button", { name: "Apartament 2 camere Titan" })).not.toBeInTheDocument();
+    const opportunities = screen.getByTestId("hot-opportunities");
+    expect(await within(opportunities).findByRole("button", { name: "Studio premium Herastrau" })).toBeInTheDocument();
+    expect(within(opportunities).queryByRole("button", { name: "Apartament 2 camere Titan" })).not.toBeInTheDocument();
   });
 
   it("loads tenant workflow from a backend endpoint when available", async () => {
@@ -80,13 +80,12 @@ describe("App", () => {
 
     render(<App />);
 
-    const canvas = screen.getByTestId("spatial-canvas");
-    expect(await within(canvas).findByRole("button", { name: "Listing live din Worker" })).toBeInTheDocument();
-    fireEvent.click(within(canvas).getByRole("button", { name: /Tenant workflow/i }));
+    const opportunities = screen.getByTestId("hot-opportunities");
+    expect(await within(opportunities).findByRole("button", { name: "Listing live din Worker" })).toBeInTheDocument();
 
-    const inspector = screen.getByTestId("node-inspector");
-    expect(await within(inspector).findByText(/Workflow live/i)).toBeInTheDocument();
-    expect(within(inspector).getAllByText(/Assignee: Mara/i).length).toBeGreaterThan(0);
+    const drawer = screen.getByTestId("selected-listing-drawer");
+    expect(await within(drawer).findByText(/Workflow live/i)).toBeInTheDocument();
+    expect(within(drawer).getByText(/Assignee: Mara/i)).toBeInTheDocument();
     expect(fetchSpy).toHaveBeenCalledWith(
       `https://worker.example.dev/api/orgs/${demoOrgId}/listings/33333333-3333-4333-8333-333333333333/workflow`,
       expect.objectContaining({
@@ -183,13 +182,11 @@ describe("App", () => {
 
     render(<App />);
 
-    const canvas = screen.getByTestId("spatial-canvas");
-    fireEvent.click(await within(canvas).findByRole("button", { name: /Tenant workflow/i }));
-    fireEvent.click(screen.getByRole("button", { name: "Contacted" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Contacted" }));
 
-    const inspector = screen.getByTestId("node-inspector");
-    expect(await within(inspector).findByText(/Salvat local/i)).toBeInTheDocument();
-    expect(within(inspector).getByText(/Status/i)).toBeInTheDocument();
+    const drawer = screen.getByTestId("selected-listing-drawer");
+    expect(await within(drawer).findByText(/Salvat local/i)).toBeInTheDocument();
+    expect(within(drawer).getByText(/Status/i)).toBeInTheDocument();
     await waitFor(() =>
       expect(fetchSpy).toHaveBeenCalledWith(
         `https://worker.example.dev/api/orgs/${demoOrgId}/listings/cl-apt-titan/state`,
@@ -212,15 +209,15 @@ describe("App", () => {
 
     render(<App />);
 
-    const canvas = screen.getByTestId("spatial-canvas");
-    expect(await within(canvas).findByRole("button", { name: "Listing live din Worker" })).toBeInTheDocument();
+    const opportunities = screen.getByTestId("hot-opportunities");
+    expect(await within(opportunities).findByRole("button", { name: "Listing live din Worker" })).toBeInTheDocument();
     expect(screen.getByText(/Live API: listinguri incarcate din Worker/i)).toBeInTheDocument();
     await waitFor(() =>
-      expect(within(canvas).queryByRole("button", { name: "Apartament 2 camere Titan" })).not.toBeInTheDocument()
+      expect(within(opportunities).queryByRole("button", { name: "Apartament 2 camere Titan" })).not.toBeInTheDocument()
     );
   });
 
-  it("creates, edits, and deletes saved searches from the spatial utility panel", async () => {
+  it("creates, edits, and deletes saved searches from the selected drawer", async () => {
     render(<App />);
     const savedPanel = screen.getByTestId("saved-searches");
 
@@ -278,16 +275,10 @@ describe("App", () => {
 
     render(<App />);
 
-    expect(await screen.findByText("Portal Live Health")).toBeInTheDocument();
-    fireEvent.click(within(screen.getByTestId("spatial-canvas")).getByRole("button", { name: "Source health" }));
-    const inspector = screen.getByTestId("node-inspector");
-    expect(within(inspector).getByText(/Per-source health/i)).toBeInTheDocument();
-    expect(within(inspector).getByText(/Mode: on/i)).toBeInTheDocument();
-    expect(within(inspector).getByText(/Listings: 42/i)).toBeInTheDocument();
-    expect(within(inspector).getByText(/Latest seen: 2026-05-25T11:25:50.000Z/i)).toBeInTheDocument();
-    expect(within(inspector).getByText(/Time-to-index: 3 min/i)).toBeInTheDocument();
-    expect(within(inspector).getByText(/Coverage: 75%/i)).toBeInTheDocument();
-    expect(within(inspector).getByText("80%")).toBeInTheDocument();
+    const map = screen.getByTestId("market-radar-map");
+    expect(await within(map).findByText("Portal Live Health")).toBeInTheDocument();
+    expect(within(map).getByText("80%")).toBeInTheDocument();
+    expect(within(map).getByText(/75% coverage/i)).toBeInTheDocument();
   });
 });
 
