@@ -1,7 +1,17 @@
 import { useDeferredValue, useEffect, useState, type FormEvent } from "react";
-import type { AlertDelivery, DemoListing, PropertyType, SavedSearch, SourceHealth, TransactionType } from "../data/demoData";
+import type {
+  AlertDelivery,
+  BillingPlan,
+  CommercialReadinessGate,
+  DemoListing,
+  PropertyType,
+  SavedSearch,
+  SourceHealth,
+  TransactionType
+} from "../data/demoData";
 import type { TenantWorkflowItem, TenantWorkflowStatus } from "../lib/tenantWorkflowApi";
 import { ActivityTimeline } from "./ActivityTimeline";
+import { CommercialReadinessPanel } from "./CommercialReadinessPanel";
 import { HotOpportunitiesPanel } from "./HotOpportunitiesPanel";
 import { MarketMap } from "./MarketMap";
 import { RadarCommandBar } from "./RadarCommandBar";
@@ -36,6 +46,19 @@ export interface MarketRadarAppShellProps {
   savedSearchAlertsEnabled: boolean;
   savedSearchMessage: string;
   editingSavedSearchId: string | null;
+  billingPlans: BillingPlan[];
+  readinessGates: CommercialReadinessGate[];
+  workspaceName: string;
+  workspaceSlug: string;
+  billingEmail: string;
+  onboardingMessage: string;
+  billingMessage: string;
+  complianceEmail: string;
+  complianceSubject: string;
+  complianceTargetUrl: string;
+  complianceDetails: string;
+  complianceMessage: string;
+  isCommercialActionLoading: boolean;
   onRefreshListings: () => void;
   onWorkflowStatusChange: (listingId: string, status: TenantWorkflowStatus) => void;
   onWorkflowNoteCreate: (listingId: string, body: string) => void;
@@ -51,6 +74,16 @@ export interface MarketRadarAppShellProps {
   onSavedSearchSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onSavedSearchEdit: (search: SavedSearch) => void;
   onSavedSearchDelete: (search: SavedSearch) => void;
+  onWorkspaceNameChange: (value: string) => void;
+  onWorkspaceSlugChange: (value: string) => void;
+  onBillingEmailChange: (value: string) => void;
+  onWorkspaceSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onPlanSelect: (plan: BillingPlan) => void;
+  onComplianceEmailChange: (value: string) => void;
+  onComplianceSubjectChange: (value: string) => void;
+  onComplianceTargetUrlChange: (value: string) => void;
+  onComplianceDetailsChange: (value: string) => void;
+  onComplianceSubmit: (event: FormEvent<HTMLFormElement>) => void;
 }
 
 const defaultFilters: RadarFilters = {
@@ -182,6 +215,31 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
               onSavedSearchSubmit={props.onSavedSearchSubmit}
               onSavedSearchEdit={props.onSavedSearchEdit}
               onSavedSearchDelete={props.onSavedSearchDelete}
+            />
+            <CommercialReadinessPanel
+              billingPlans={props.billingPlans}
+              readinessGates={props.readinessGates}
+              workspaceName={props.workspaceName}
+              workspaceSlug={props.workspaceSlug}
+              billingEmail={props.billingEmail}
+              onboardingMessage={props.onboardingMessage}
+              billingMessage={props.billingMessage}
+              complianceEmail={props.complianceEmail}
+              complianceSubject={props.complianceSubject}
+              complianceTargetUrl={props.complianceTargetUrl}
+              complianceDetails={props.complianceDetails}
+              complianceMessage={props.complianceMessage}
+              isCommercialActionLoading={props.isCommercialActionLoading}
+              onWorkspaceNameChange={props.onWorkspaceNameChange}
+              onWorkspaceSlugChange={props.onWorkspaceSlugChange}
+              onBillingEmailChange={props.onBillingEmailChange}
+              onWorkspaceSubmit={props.onWorkspaceSubmit}
+              onPlanSelect={props.onPlanSelect}
+              onComplianceEmailChange={props.onComplianceEmailChange}
+              onComplianceSubjectChange={props.onComplianceSubjectChange}
+              onComplianceTargetUrlChange={props.onComplianceTargetUrlChange}
+              onComplianceDetailsChange={props.onComplianceDetailsChange}
+              onComplianceSubmit={props.onComplianceSubmit}
             />
           </div>
         </div>

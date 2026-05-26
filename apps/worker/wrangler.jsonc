@@ -12,7 +12,8 @@
   },
   "vars": {
     "ENVIRONMENT": "development",
-    "SUPABASE_URL": "https://mqzchppokgaoacgkqkzh.supabase.co"
+    "SUPABASE_URL": "https://mqzchppokgaoacgkqkzh.supabase.co",
+    "PUBLIC_APP_URL": "https://thor-crm-index-link-web.pages.dev"
   },
   "triggers": {
     "crons": [
@@ -38,17 +39,24 @@
       {
         "queue": "thor-crm-discover",
         "max_batch_size": 10,
-        "max_batch_timeout": 30
+        "max_batch_timeout": 30,
+        "max_retries": 3,
+        "max_concurrency": 1,
+        "retry_delay": 60
       },
       {
         "queue": "thor-crm-fetch",
         "max_batch_size": 10,
-        "max_batch_timeout": 30
+        "max_batch_timeout": 30,
+        "max_retries": 3,
+        "max_concurrency": 1,
+        "retry_delay": 120
       },
       {
         "queue": "thor-crm-match",
         "max_batch_size": 25,
-        "max_batch_timeout": 30
+        "max_batch_timeout": 30,
+        "max_retries": 3
       }
     ]
   }

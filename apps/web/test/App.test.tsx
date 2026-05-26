@@ -17,9 +17,11 @@ describe("App", () => {
     expect(screen.getByTestId("market-radar-shell")).toBeInTheDocument();
     expect(screen.getByTestId("market-radar-map")).toBeInTheDocument();
     expect(screen.getByTestId("selected-listing-drawer")).toBeInTheDocument();
+    expect(screen.getByTestId("commercial-readiness")).toBeInTheDocument();
     expect(screen.getByLabelText(/Cauta anunturi, zone, surse/i)).toBeInTheDocument();
     expect(screen.getByTestId("supabase-auth")).toBeInTheDocument();
     expect(screen.getByTestId("saved-searches")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Creeaza workspace pilot/i })).toBeInTheDocument();
   });
 
   it("shows demo-safe index plus link source URLs in the selected drawer", async () => {

@@ -1,4 +1,5 @@
 import type { DiscoverMessage, Env, FetchMessage, MatchMessage } from "../runtime/env";
+import { recordCrawlFailure } from "./crawlGovernance";
 import { handleDiscoverMessage } from "./discoverPipeline";
 import { handleFetchMessage } from "./fetchPipeline";
 
@@ -11,6 +12,7 @@ export async function handleQueueBatch(batch: MessageBatch<QueueBody>, env: Env)
       message.ack();
     } catch (error) {
       console.error("queue_message_failed", { id: message.id, error: error instanceof Error ? error.message : String(error) });
+      await recordQueueFailure(message.body, env, error);
       if (isPermanentQueueError(error)) {
         message.ack();
         continue;
@@ -32,6 +34,21 @@ async function handleQueueMessage(body: QueueBody, env: Env): Promise<void> {
   }
 
   console.log("queue_message_skipped", { kind: body.kind });
+}
+
+async function recordQueueFailure(body: QueueBody, env: Env, error: unknown): Promise<void> {
+  if (!("sourceId" in body) || !body.sourceId) {
+    return;
+  }
+
+  const results = await Promise.allSettled([recordCrawlFailure(env, body.sourceId, error)]);
+  const failure = results.find((result) => result.status === "rejected");
+  if (failure?.status === "rejected") {
+    console.warn("crawl_failure_governance_failed", {
+      sourceId: body.sourceId,
+      error: failure.reason instanceof Error ? failure.reason.message : String(failure.reason)
+    });
+  }
 }
 
 function isPermanentQueueError(error: unknown): boolean {

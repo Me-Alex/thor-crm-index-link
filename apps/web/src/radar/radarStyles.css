@@ -931,6 +931,157 @@
   color: #ff9e91;
 }
 
+.commercial-panel {
+  display: grid;
+  gap: 0.9rem;
+  align-content: start;
+  border: 1px solid rgba(142, 167, 204, 0.14);
+  border-radius: 0.9rem;
+  background: rgba(9, 17, 34, 0.78);
+  padding: 0.95rem;
+}
+
+.readiness-gates {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.readiness-gate {
+  min-width: 0;
+  border: 1px solid rgba(142, 167, 204, 0.14);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.65rem;
+}
+
+.readiness-gate span,
+.readiness-gate strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.readiness-gate span {
+  color: var(--radar-muted);
+  font-size: 0.72rem;
+}
+
+.readiness-gate strong {
+  margin-top: 0.3rem;
+  color: var(--radar-text);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+}
+
+.readiness-gate.is-ready {
+  border-color: rgba(51, 209, 141, 0.36);
+}
+
+.readiness-gate.is-needs_secrets,
+.readiness-gate.is-review_required {
+  border-color: rgba(246, 169, 58, 0.42);
+}
+
+.commercial-form {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.commercial-form label {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  color: var(--radar-muted);
+  font-size: 0.78rem;
+}
+
+.commercial-form input,
+.commercial-form textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid rgba(142, 167, 204, 0.16);
+  border-radius: 0.75rem;
+  background: rgba(5, 11, 23, 0.72);
+  color: var(--radar-text);
+  padding: 0.65rem 0.75rem;
+}
+
+.commercial-form textarea {
+  min-height: 5rem;
+  resize: vertical;
+}
+
+.commercial-form button,
+.billing-plan-grid button {
+  min-height: 2.35rem;
+  border: 1px solid rgba(156, 200, 255, 0.3);
+  border-radius: 0.75rem;
+  background: rgba(79, 124, 255, 0.18);
+  color: var(--radar-text);
+  cursor: pointer;
+}
+
+.commercial-form button:disabled,
+.billing-plan-grid button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.commercial-form p,
+.commercial-message {
+  margin: 0;
+  color: var(--radar-muted);
+  font-size: 0.78rem;
+  line-height: 1.45;
+}
+
+.billing-plan-grid {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.billing-plan-grid article {
+  display: grid;
+  gap: 0.5rem;
+  border: 1px solid rgba(142, 167, 204, 0.14);
+  border-radius: 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 0.65rem;
+}
+
+.billing-plan-grid article > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.7rem;
+}
+
+.billing-plan-grid strong {
+  color: var(--radar-text);
+}
+
+.billing-plan-grid span,
+.billing-plan-grid p {
+  margin: 0;
+  color: var(--radar-muted);
+  font-size: 0.78rem;
+}
+
+.legal-link-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+}
+
+.legal-link-row a {
+  border: 1px solid rgba(142, 167, 204, 0.16);
+  border-radius: 0.7rem;
+  background: rgba(255, 255, 255, 0.02);
+  color: var(--radar-text);
+  font-size: 0.76rem;
+  padding: 0.45rem 0.6rem;
+  text-decoration: none;
+}
+
 @media (max-width: 1420px) {
   .radar-command-filters {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1003,6 +1154,7 @@
   .radar-command-filters,
   .drawer-inline-grid,
   .drawer-metric-grid,
+  .readiness-gates,
   .radar-kpi-strip,
   .activity-timeline-list {
     grid-template-columns: 1fr;

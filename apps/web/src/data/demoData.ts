@@ -67,6 +67,23 @@ export interface SourceHealth {
   timeToIndexMinutes: number;
 }
 
+export interface BillingPlan {
+  id: "pilot" | "pro" | "scale";
+  name: string;
+  priceEurMonthly: number;
+  trialDays: number;
+  seatsIncluded: number;
+  checkoutRequired: boolean;
+  features: string[];
+}
+
+export interface CommercialReadinessGate {
+  id: string;
+  label: string;
+  status: "ready" | "needs_secrets" | "review_required" | "blocked";
+  owner: string;
+}
+
 export const workerHealthUrl = "https://thor-crm-index-link-worker.floreaalexandru2002.workers.dev/health";
 export const githubRepoUrl = "https://github.com/Me-Alex/thor-crm-index-link";
 export const supabaseProjectUrl = "https://mqzchppokgaoacgkqkzh.supabase.co";
@@ -260,4 +277,43 @@ export const sourceHealth: SourceHealth[] = [
     matchRate: 0,
     timeToIndexMinutes: 0
   }
+];
+
+export const billingPlans: BillingPlan[] = [
+  {
+    id: "pilot",
+    name: "Pilot",
+    priceEurMonthly: 299,
+    trialDays: 14,
+    seatsIncluded: 3,
+    checkoutRequired: false,
+    features: ["workspace agentie", "surse activate gradual", "workflow status/note/taguri", "support async"]
+  },
+  {
+    id: "pro",
+    name: "Pro",
+    priceEurMonthly: 699,
+    trialDays: 14,
+    seatsIncluded: 10,
+    checkoutRequired: true,
+    features: ["crawler monitorizat", "alerte salvate", "source health", "raport prospetime/dedup"]
+  },
+  {
+    id: "scale",
+    name: "Scale",
+    priceEurMonthly: 1499,
+    trialDays: 14,
+    seatsIncluded: 25,
+    checkoutRequired: true,
+    features: ["surse prioritare", "SLA operational", "support prioritar", "audit export"]
+  }
+];
+
+export const commercialReadinessGates: CommercialReadinessGate[] = [
+  { id: "crawler_governance", label: "Crawler governance", status: "ready", owner: "ops" },
+  { id: "tenant_onboarding", label: "Tenant onboarding", status: "ready", owner: "product" },
+  { id: "billing_checkout", label: "Billing checkout", status: "needs_secrets", owner: "ops" },
+  { id: "legal_pack", label: "Legal pack", status: "review_required", owner: "legal" },
+  { id: "dedup_quality", label: "Dedup quality reporting", status: "ready", owner: "engineering" },
+  { id: "freshness_sla", label: "Freshness SLA reporting", status: "ready", owner: "ops" }
 ];
