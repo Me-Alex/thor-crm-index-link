@@ -23,7 +23,7 @@ import {
   type TenantWorkflowItem,
   type TenantWorkflowStatus
 } from "./lib/tenantWorkflowApi";
-import { SpatialAppShell } from "./spatial/SpatialAppShell";
+import { MarketRadarAppShell } from "./radar/MarketRadarAppShell";
 
 function App() {
   const [listings, setListings] = useState<DemoListing[]>(demoListings);
@@ -497,7 +497,7 @@ function App() {
   };
 
   return (
-    <SpatialAppShell
+    <MarketRadarAppShell
       listings={listings}
       sourceHealth={sourceHealthCards}
       workflowItems={workflowItems}
