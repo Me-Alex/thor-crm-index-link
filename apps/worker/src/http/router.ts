@@ -1,5 +1,13 @@
 import { demoListingFixtureHtml, sourceRegistry } from "@thor-crm/adapters";
 import type { SourceRegistryEntry } from "@thor-crm/adapters";
+import {
+  bootstrapWorkspace,
+  commercialReadinessResponse,
+  createCheckoutSession,
+  createComplianceRequest,
+  getBillingStatus,
+  listBillingPlans
+} from "../api/commercial";
 import { listDedupReviewLinks } from "../api/dedupReview";
 import { getListingById, listListings } from "../api/listings";
 import { listSourceHealth } from "../api/sourceHealth";
@@ -41,12 +49,18 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     url.pathname === "/health" ||
     url.pathname === "/ready" ||
     url.pathname === "/api/listings" ||
+    url.pathname === "/api/billing/plans" ||
+    url.pathname === "/api/commercial-readiness" ||
     url.pathname === "/api/source-health" ||
     /^\/api\/listings\/[^/]+$/.test(url.pathname);
   const isTenantApiRoute =
+    url.pathname === "/api/onboarding/workspace" ||
+    url.pathname === "/api/compliance/requests" ||
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/workflow$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/state$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/listings\/[^/]+\/notes$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/billing$/.test(url.pathname) ||
+    /^\/api\/orgs\/[^/]+\/billing\/checkout$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/saved-searches$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/saved-searches\/[^/]+$/.test(url.pathname) ||
     /^\/api\/orgs\/[^/]+\/alerts$/.test(url.pathname);
@@ -95,6 +109,56 @@ export async function handleRequest(request: Request, env: Env, options: RouterO
     }
 
     return withPublicCors(await listSourceHealth(env, options));
+  }
+
+  if (url.pathname === "/api/billing/plans") {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    return withPublicCors(listBillingPlans());
+  }
+
+  if (url.pathname === "/api/commercial-readiness") {
+    if (request.method !== "GET") {
+      return methodNotAllowed();
+    }
+
+    return withPublicCors(commercialReadinessResponse());
+  }
+
+  if (url.pathname === "/api/onboarding/workspace") {
+    if (request.method !== "POST") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(await bootstrapWorkspace(request, env, options));
+  }
+
+  if (url.pathname === "/api/compliance/requests") {
+    if (request.method !== "POST") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(await createComplianceRequest(request, env, options));
+  }
+
+  const tenantBillingMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/billing$/);
+  if (tenantBillingMatch) {
+    if (request.method !== "GET") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(await getBillingStatus(request, env, decodeURIComponent(tenantBillingMatch[1] ?? ""), options));
+  }
+
+  const tenantCheckoutMatch = url.pathname.match(/^\/api\/orgs\/([^/]+)\/billing\/checkout$/);
+  if (tenantCheckoutMatch) {
+    if (request.method !== "POST") {
+      return withApiCors(methodNotAllowed());
+    }
+
+    return withApiCors(await createCheckoutSession(request, env, decodeURIComponent(tenantCheckoutMatch[1] ?? ""), options));
   }
 
   const listingDetailMatch = url.pathname.match(/^\/api\/listings\/([^/]+)$/);

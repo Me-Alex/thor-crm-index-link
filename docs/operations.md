@@ -39,6 +39,7 @@ npx wrangler queues create thor-crm-fetch
 npx wrangler queues create thor-crm-match
 npx wrangler secret put SUPABASE_SERVICE_ROLE_KEY --config apps/worker/wrangler.jsonc
 npx wrangler secret put ADMIN_API_KEY --config apps/worker/wrangler.jsonc
+npx wrangler secret put STRIPE_SECRET_KEY --config apps/worker/wrangler.jsonc
 npm run deploy --workspace @thor-crm/worker
 ```
 
@@ -47,6 +48,7 @@ Reguli:
 - Deploy-ul se face doar după `npm run verify`.
 - Secretele Cloudflare `SUPABASE_SERVICE_ROLE_KEY` și `ADMIN_API_KEY` rămân obligatorii și după introducerea endpointurilor autentificate; tokenul de utilizator Supabase nu înlocuiește service role-ul backend.
 - `SUPABASE_URL` rămâne variabilă de Worker, nu secret, iar cheile private se setează doar prin `wrangler secret put` sau dashboard Cloudflare.
+- `PUBLIC_APP_URL`, `STRIPE_PRO_PRICE_ID` si `STRIPE_SCALE_PRICE_ID` sunt variabile de Worker pentru checkout; cheia privata Stripe ramane secret.
 - Queue handlers trebuie să valideze payload-ul.
 - `429` și `503` reduc frecvența sau pun sursa în `degraded`, nu declanșează retry agresiv.
 - Worker-ul expune `/health` pentru runtime și `/ready` pentru verificarea configurației Supabase + REST connectivity.

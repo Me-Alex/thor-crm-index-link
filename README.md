@@ -48,15 +48,16 @@ Regulile complete pentru agenți sunt în `AGENTS.md`.
 - `docs/architecture.md` — arhitectura MVP și boundary global/tenant.
 - `docs/operations.md` — provisioning și operare Cloudflare/Supabase/GitHub.
 - `docs/source-policy.md` — policy pentru surse, crawling, PII și incident runbook.
+- `docs/commercial-readiness.md` — checklist pentru pilot platit, billing, onboarding, compliance si limite ramase.
 - `docs/codex-build-report.md` — raport complet pentru construirea proiectului cu OpenAI Codex.
 - `docs/claude-code-build-report.md` — raport pentru construirea proiectului cu Claude Code.
 
 ## Deploy minim
 
 1. Link-uiește proiectul Supabase și rulează migrations din `supabase/migrations`. Deploy-ul curent folosește proiectul dedicat `thor-crm-index-link` (`mqzchppokgaoacgkqkzh`).
-2. Setează secretele Cloudflare Worker: `SUPABASE_SERVICE_ROLE_KEY` și `ADMIN_API_KEY`.
+2. Setează secretele Cloudflare Worker: `SUPABASE_SERVICE_ROLE_KEY`, `ADMIN_API_KEY` si, pentru checkout platit, `STRIPE_SECRET_KEY`.
 3. Creează Cloudflare Queues: `thor-crm-discover`, `thor-crm-fetch`, `thor-crm-match`.
-4. Actualizează `SUPABASE_URL` în `apps/worker/wrangler.jsonc`.
+4. Actualizează `SUPABASE_URL`, `PUBLIC_APP_URL`, `STRIPE_PRO_PRICE_ID` si `STRIPE_SCALE_PRICE_ID` in `apps/worker/wrangler.jsonc`.
 5. Rulează `npm run deploy --workspace @thor-crm/worker`.
 
 Nu rula deploy, crawling live sau comenzi destructive fără confirmare explicită.

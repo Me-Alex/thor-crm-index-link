@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thor CRM - DPA</title>
+    <style>
+      body { margin: 0; font-family: Inter, Arial, sans-serif; color: #d8e2f2; background: #07111f; line-height: 1.6; }
+      main { max-width: 860px; margin: 0 auto; padding: 48px 20px; }
+      h1, h2 { color: #ffffff; }
+      section { border-top: 1px solid rgba(156, 200, 255, 0.18); padding-top: 18px; margin-top: 24px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Data Processing Addendum - pilot</h1>
+      <p>Sablon operational pentru clienti B2B. Necesita review juridic si completare cu datele operatorului, imputernicitului, subprocesatorilor si masurilor tehnice.</p>
+      <section>
+        <h2>Roluri</h2>
+        <p>Clientul este operator pentru datele introduse in workspace si pentru workflow-ul intern. Thor actioneaza ca imputernicit pentru datele clientului si ca operator separat pentru securitate, billing si audit operational.</p>
+      </section>
+      <section>
+        <h2>Masuri tehnice</h2>
+        <p>Acces pe baza de rol, separare tenant, RLS in Supabase, criptare in tranzit, secrete in Cloudflare, audit events si control operational pentru surse.</p>
+      </section>
+      <section>
+        <h2>Subprocesatori</h2>
+        <p>Subprocesatorii pilot includ Cloudflare, Supabase, GitHub si Stripe daca billingul este activat.</p>
+      </section>
+    </main>
+  </body>
+</html>

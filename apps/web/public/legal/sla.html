@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ro">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Thor CRM - SLA pilot</title>
+    <style>
+      body { margin: 0; font-family: Inter, Arial, sans-serif; color: #d8e2f2; background: #07111f; line-height: 1.6; }
+      main { max-width: 860px; margin: 0 auto; padding: 48px 20px; }
+      h1, h2 { color: #ffffff; }
+      section { border-top: 1px solid rgba(156, 200, 255, 0.18); padding-top: 18px; margin-top: 24px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>SLA operational - pilot</h1>
+      <p>In pilot, SLA-ul este raportat pe sursele active aprobate, nu pe toate portalurile publice din Romania.</p>
+      <section>
+        <h2>Disponibilitate aplicatie</h2>
+        <p>Tinta: 99% lunar pentru dashboard si Worker health, cu exceptia mentenantei planificate si incidentelor furnizorilor Cloudflare/Supabase.</p>
+      </section>
+      <section>
+        <h2>Prospetime date</h2>
+        <p>Tinta pentru surse active: detectare in minute pentru seed URLs aprobate. Sursele in degraded/off sunt excluse din tinta pana la remediere.</p>
+      </section>
+      <section>
+        <h2>Deduplicare</h2>
+        <p>Deduplicarea foloseste prag conservator si audit de match. Fals-pozitivele confirmate sunt tratate ca incident de calitate.</p>
+      </section>
+      <section>
+        <h2>Suport</h2>
+        <p>Pilot: raspuns in 1 zi lucratoare pentru incidente normale si in 4 ore lucratoare pentru blocaje critice convenite contractual.</p>
+      </section>
+    </main>
+  </body>
+</html>

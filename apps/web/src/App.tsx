@@ -1,5 +1,23 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
-import { alertDeliveries, demoListings, savedSearches, sourceHealth, type DemoListing, type SavedSearch } from "./data/demoData";
+import {
+  alertDeliveries,
+  billingPlans,
+  commercialReadinessGates,
+  demoListings,
+  savedSearches,
+  sourceHealth,
+  type BillingPlan,
+  type CommercialReadinessGate,
+  type DemoListing,
+  type SavedSearch
+} from "./data/demoData";
+import {
+  bootstrapWorkspace,
+  createBillingCheckout,
+  fetchBillingPlans,
+  fetchCommercialReadiness,
+  submitComplianceRequest
+} from "./lib/commercialApi";
 import { fetchWorkerListings, fetchWorkerSourceHealth, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
 import {
   createTenantSavedSearch,
@@ -56,6 +74,19 @@ function App() {
   const [workflowMessage, setWorkflowMessage] = useState("Workflow demo: se folosesc listingurile indexate local.");
   const [workflowActionMessage, setWorkflowActionMessage] = useState("");
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(false);
+  const [billingPlanItems, setBillingPlanItems] = useState<BillingPlan[]>(billingPlans);
+  const [readinessGates, setReadinessGates] = useState<CommercialReadinessGate[]>(commercialReadinessGates);
+  const [workspaceName, setWorkspaceName] = useState("");
+  const [workspaceSlug, setWorkspaceSlug] = useState("");
+  const [billingEmail, setBillingEmail] = useState("");
+  const [onboardingMessage, setOnboardingMessage] = useState("Creeaza un workspace pilot dupa login Supabase.");
+  const [billingMessage, setBillingMessage] = useState("Pilotul poate porni fara checkout; planurile platite cer configurare Stripe.");
+  const [complianceEmail, setComplianceEmail] = useState("");
+  const [complianceSubject, setComplianceSubject] = useState("");
+  const [complianceTargetUrl, setComplianceTargetUrl] = useState("");
+  const [complianceDetails, setComplianceDetails] = useState("");
+  const [complianceMessage, setComplianceMessage] = useState("Cererile de takedown/GDPR sunt inregistrate auditabil in backend.");
+  const [isCommercialActionLoading, setIsCommercialActionLoading] = useState(false);
   const workflowStatusOverrides = useRef(new Map<string, TenantWorkflowStatus>());
 
   const applyWorkflowOverrides = (items: TenantWorkflowItem[]) =>
@@ -137,6 +168,31 @@ function App() {
       .catch(() => {
         if (!ignoreResult) {
           setSourceHealthCards(sourceHealth);
+        }
+      });
+
+    return () => {
+      ignoreResult = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    let ignoreResult = false;
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    if (!workerApiBaseUrl) {
+      return undefined;
+    }
+
+    Promise.all([fetchBillingPlans({ baseUrl: workerApiBaseUrl }), fetchCommercialReadiness({ baseUrl: workerApiBaseUrl })])
+      .then(([apiBillingPlans, apiReadinessGates]) => {
+        if (ignoreResult) return;
+        if (apiBillingPlans.length > 0) setBillingPlanItems(apiBillingPlans);
+        if (apiReadinessGates.length > 0) setReadinessGates(apiReadinessGates);
+      })
+      .catch(() => {
+        if (!ignoreResult) {
+          setBillingPlanItems(billingPlans);
+          setReadinessGates(commercialReadinessGates);
         }
       });
 
@@ -496,6 +552,101 @@ function App() {
     setAuthMessage("Delogat: workflow-ul ramane in demo pana la un nou login Supabase.");
   };
 
+  const handleWorkspaceSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
+    const normalizedName = workspaceName.trim();
+    const normalizedSlug = workspaceSlug.trim() || normalizedName.toLowerCase().replace(/[^a-z0-9]+/gu, "-").replace(/^-+|-+$/gu, "");
+
+    if (!normalizedName || !normalizedSlug) {
+      setOnboardingMessage("Completeaza numele agentiei si slug-ul.");
+      return;
+    }
+    if (!workerApiBaseUrl || !accessToken) {
+      setOnboardingMessage("Onboarding demo: lipseste Worker API URL sau login Supabase.");
+      return;
+    }
+
+    setIsCommercialActionLoading(true);
+    setOnboardingMessage("Se creeaza workspace-ul pilot.");
+    try {
+      const workspace = await bootstrapWorkspace({
+        baseUrl: workerApiBaseUrl,
+        accessToken,
+        name: normalizedName,
+        slug: normalizedSlug,
+        billingEmail: billingEmail.trim() || authSession?.email || ""
+      });
+      setWorkspaceSlug(workspace.slug);
+      setOnboardingMessage(`Workspace pilot creat: ${workspace.slug}.`);
+    } catch (error) {
+      setOnboardingMessage(`Onboarding esuat: ${error instanceof Error ? error.message : "backend indisponibil"}.`);
+    } finally {
+      setIsCommercialActionLoading(false);
+    }
+  };
+
+  const handlePlanSelect = async (plan: BillingPlan) => {
+    if (!plan.checkoutRequired) {
+      setBillingMessage("Planul Pilot este activabil prin onboarding, cu trial de 14 zile.");
+      return;
+    }
+
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
+    if (!workerApiBaseUrl || !accessToken) {
+      setBillingMessage("Checkout demo: lipseste Worker API URL sau login Supabase.");
+      return;
+    }
+
+    setIsCommercialActionLoading(true);
+    setBillingMessage("Se creeaza sesiunea Stripe Checkout.");
+    try {
+      const checkoutUrl = await createBillingCheckout({
+        baseUrl: workerApiBaseUrl,
+        accessToken,
+        orgId: demoOrgId,
+        plan: plan.id === "scale" ? "scale" : "pro"
+      });
+      window.location.assign(checkoutUrl);
+    } catch (error) {
+      setBillingMessage(`Checkout indisponibil: ${error instanceof Error ? error.message : "Stripe nu este configurat"}.`);
+    } finally {
+      setIsCommercialActionLoading(false);
+    }
+  };
+
+  const handleComplianceSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    if (!workerApiBaseUrl) {
+      setComplianceMessage("Compliance demo: Worker API URL nu este configurat.");
+      return;
+    }
+
+    setIsCommercialActionLoading(true);
+    setComplianceMessage("Se inregistreaza cererea.");
+    try {
+      await submitComplianceRequest({
+        baseUrl: workerApiBaseUrl,
+        requestType: "takedown",
+        requesterEmail: complianceEmail,
+        subject: complianceSubject,
+        targetUrl: complianceTargetUrl,
+        details: complianceDetails
+      });
+      setComplianceSubject("");
+      setComplianceTargetUrl("");
+      setComplianceDetails("");
+      setComplianceMessage("Cerere inregistrata pentru review operational.");
+    } catch (error) {
+      setComplianceMessage(`Cererea nu a fost inregistrata: ${error instanceof Error ? error.message : "backend indisponibil"}.`);
+    } finally {
+      setIsCommercialActionLoading(false);
+    }
+  };
+
   return (
     <MarketRadarAppShell
       listings={listings}
@@ -522,6 +673,19 @@ function App() {
       savedSearchAlertsEnabled={savedSearchAlertsEnabled}
       savedSearchMessage={savedSearchMessage}
       editingSavedSearchId={editingSavedSearchId}
+      billingPlans={billingPlanItems}
+      readinessGates={readinessGates}
+      workspaceName={workspaceName}
+      workspaceSlug={workspaceSlug}
+      billingEmail={billingEmail}
+      onboardingMessage={onboardingMessage}
+      billingMessage={billingMessage}
+      complianceEmail={complianceEmail}
+      complianceSubject={complianceSubject}
+      complianceTargetUrl={complianceTargetUrl}
+      complianceDetails={complianceDetails}
+      complianceMessage={complianceMessage}
+      isCommercialActionLoading={isCommercialActionLoading}
       onRefreshListings={() => void loadListings()}
       onWorkflowStatusChange={handleWorkflowStatusChange}
       onWorkflowNoteCreate={(listingId, body) => void handleWorkflowNoteCreate(listingId, body)}
@@ -537,6 +701,16 @@ function App() {
       onSavedSearchSubmit={handleSavedSearchSubmit}
       onSavedSearchEdit={handleSavedSearchEdit}
       onSavedSearchDelete={(search) => void handleSavedSearchDelete(search)}
+      onWorkspaceNameChange={setWorkspaceName}
+      onWorkspaceSlugChange={setWorkspaceSlug}
+      onBillingEmailChange={setBillingEmail}
+      onWorkspaceSubmit={(event) => void handleWorkspaceSubmit(event)}
+      onPlanSelect={(plan) => void handlePlanSelect(plan)}
+      onComplianceEmailChange={setComplianceEmail}
+      onComplianceSubjectChange={setComplianceSubject}
+      onComplianceTargetUrlChange={setComplianceTargetUrl}
+      onComplianceDetailsChange={setComplianceDetails}
+      onComplianceSubmit={(event) => void handleComplianceSubmit(event)}
     />
   );
 }

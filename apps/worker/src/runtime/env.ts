@@ -3,6 +3,11 @@ export interface Env {
   SUPABASE_URL: string;
   SUPABASE_SERVICE_ROLE_KEY: string;
   ADMIN_API_KEY: string;
+  PUBLIC_APP_URL?: string;
+  STRIPE_SECRET_KEY?: string;
+  STRIPE_PRO_PRICE_ID?: string;
+  STRIPE_SCALE_PRICE_ID?: string;
+  STRIPE_WEBHOOK_SECRET?: string;
   DISCOVER_QUEUE?: Queue<DiscoverMessage>;
   FETCH_QUEUE?: Queue<FetchMessage>;
   MATCH_QUEUE?: Queue<MatchMessage>;
