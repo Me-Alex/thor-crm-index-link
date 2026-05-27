@@ -96,7 +96,7 @@ function buildListingNodes(listings: DemoListing[], primaryListingId: string): S
         { label: "Price", value: formatCurrency.format(listing.priceEur), tone: listing.changedToday ? "warning" : "neutral" },
         { label: "Area", value: `${listing.areaSqm} mp` },
         { label: "Rooms", value: String(listing.rooms) },
-        { label: "Match", value: `${Math.round(listing.matchScore * 100)}%`, tone: "good" }
+        { label: "Potrivire", value: `${Math.round(listing.matchScore * 100)}%`, tone: "good" }
       ],
       actions
     };
@@ -256,7 +256,7 @@ function buildEmptyGraph(options: BuildSpatialGraphOptions): SpatialGraphModel {
         title: "Nu exista listinguri indexate",
         eyebrow: "Empty state",
         subtitle: "Worker API did not return indexed listings.",
-        body: "Start a scan or check source health. The workspace remains index + link only.",
+        body: "Actualizeaza datele sau verifica source health. Workspace-ul ramane index + link only.",
         x: 390,
         y: 230,
         width: 430,

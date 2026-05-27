@@ -1,4 +1,7 @@
 import type { PropertyType, TransactionType } from "../data/demoData";
+import type { RuntimeMode } from "../lib/runtimeConfig";
+import { RadarSelect, type RadarSelectOption } from "./RadarSelect";
+import { useState } from "react";
 
 interface RadarCommandBarProps {
   location: string;
@@ -9,6 +12,8 @@ interface RadarCommandBarProps {
   query: string;
   dataMode: "fallback" | "live";
   dataMessage: string;
+  runtimeMode: RuntimeMode;
+  activeWorkspaceName: string;
   isLoadingListings: boolean;
   onLocationChange: (value: string) => void;
   onPropertyTypeChange: (value: PropertyType | "all") => void;
@@ -19,45 +24,58 @@ interface RadarCommandBarProps {
   onRefreshListings: () => void;
 }
 
+const locationOptions: Array<RadarSelectOption<string>> = [
+  { label: "Bucuresti", value: "Bucuresti" },
+  { label: "Toate zonele", value: "Toate zonele" },
+  { label: "Cluj Napoca", value: "Cluj Napoca" },
+  { label: "Iasi", value: "Iasi" }
+];
+
+const propertyTypeOptions: Array<RadarSelectOption<PropertyType | "all">> = [
+  { label: "Toate tipurile", value: "all" },
+  { label: "Apartament", value: "apartment" },
+  { label: "Casa", value: "house" },
+  { label: "Teren", value: "land" },
+  { label: "Comercial", value: "commercial" }
+];
+
+const transactionTypeOptions: Array<RadarSelectOption<TransactionType | "all">> = [
+  { label: "Vanzare + Inchiriere", value: "all" },
+  { label: "Vanzare", value: "sale" },
+  { label: "Inchiriere", value: "rent" }
+];
+
 export function RadarCommandBar(props: RadarCommandBarProps) {
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const fallbackStatusLabel = props.runtimeMode === "production" ? "Prod blocked" : "Demo fallback";
+  const refreshLabel = props.runtimeMode === "production" && props.dataMode === "fallback" ? "Reincearca date" : "Actualizeaza";
+
   return (
     <header className="radar-command-bar" aria-label="Market filters">
       <div className="radar-command-filters">
-        <label className="radar-field">
-          <span>Locatie</span>
-          <select value={props.location} onChange={(event) => props.onLocationChange(event.target.value)}>
-            <option>Bucuresti</option>
-            <option>Toate zonele</option>
-            <option>Cluj Napoca</option>
-            <option>Iasi</option>
-          </select>
-        </label>
+        <RadarSelect
+          className="radar-field"
+          label="⌖ Locatie"
+          value={props.location}
+          options={locationOptions}
+          onChange={props.onLocationChange}
+        />
 
-        <label className="radar-field">
-          <span>Tip proprietate</span>
-          <select
-            value={props.propertyType}
-            onChange={(event) => props.onPropertyTypeChange(event.target.value as PropertyType | "all")}
-          >
-            <option value="all">Toate tipurile</option>
-            <option value="apartment">Apartament</option>
-            <option value="house">Casa</option>
-            <option value="land">Teren</option>
-            <option value="commercial">Comercial</option>
-          </select>
-        </label>
+        <RadarSelect
+          className="radar-field"
+          label="Tip proprietate"
+          value={props.propertyType}
+          options={propertyTypeOptions}
+          onChange={props.onPropertyTypeChange}
+        />
 
-        <label className="radar-field">
-          <span>Tranzactie</span>
-          <select
-            value={props.transactionType}
-            onChange={(event) => props.onTransactionTypeChange(event.target.value as TransactionType | "all")}
-          >
-            <option value="all">Vanzare + Inchiriere</option>
-            <option value="sale">Vanzare</option>
-            <option value="rent">Inchiriere</option>
-          </select>
-        </label>
+        <RadarSelect
+          className="radar-field"
+          label="Tranzactie"
+          value={props.transactionType}
+          options={transactionTypeOptions}
+          onChange={props.onTransactionTypeChange}
+        />
 
         <div className="radar-field radar-field-range">
           <span>Pret (EUR)</span>
@@ -69,27 +87,70 @@ export function RadarCommandBar(props: RadarCommandBarProps) {
 
         <label className="radar-search">
           <span>Cauta listinguri</span>
+          <i aria-hidden="true">⌕</i>
           <input
             aria-label="Cauta anunturi, zone, surse"
             value={props.query}
             onChange={(event) => props.onQueryChange(event.target.value)}
             placeholder="Cauta anunturi, zone, surse..."
           />
+          <kbd>⌘ K</kbd>
         </label>
 
-        <button type="button" className="radar-ghost-button">
-          Filtre avansate <b>3</b>
+        <button
+          type="button"
+          className="radar-ghost-button"
+          aria-expanded={showAdvancedFilters}
+          aria-controls="advanced-filter-panel"
+          onClick={() => setShowAdvancedFilters((currentValue) => !currentValue)}
+        >
+          <span aria-hidden="true">≡</span> Filtre avansate <b>3</b>
         </button>
       </div>
 
+      {showAdvancedFilters ? (
+        <div id="advanced-filter-panel" className="advanced-filter-panel" data-testid="advanced-filter-panel">
+          <strong>Filtre rapide</strong>
+          <button type="button" onClick={() => props.onPropertyTypeChange("apartment")}>
+            Doar apartamente
+          </button>
+          <button type="button" onClick={() => props.onPriceMaxChange("120000")}>
+            Sub 120k EUR
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              props.onPropertyTypeChange("all");
+              props.onTransactionTypeChange("all");
+              props.onPriceMinChange("");
+              props.onPriceMaxChange("");
+              props.onQueryChange("");
+            }}
+          >
+            Reseteaza filtre
+          </button>
+        </div>
+      ) : null}
+
       <div className="radar-command-actions">
-        <div className={`radar-status-badge is-${props.dataMode}`}>
+        <div
+          className={`radar-status-badge is-${props.dataMode}${
+            props.dataMode === "fallback" && props.runtimeMode === "production" ? " is-production-blocked" : ""
+          }`}
+        >
           <span aria-hidden="true" />
-          <strong>{props.dataMode === "live" ? "Scan live" : "Demo fallback"}</strong>
+          <strong>{props.dataMode === "live" ? "Date live" : fallbackStatusLabel}</strong>
           <small>{props.dataMessage}</small>
         </div>
+        <div className="radar-top-user" aria-label={`Agentia curenta: ${props.activeWorkspaceName}`}>
+          <span className="radar-notification">4</span>
+          <span className="radar-avatar" aria-hidden="true">
+            {props.activeWorkspaceName.slice(0, 1).toUpperCase()}
+          </span>
+          <strong data-testid="active-workspace-name">{props.activeWorkspaceName}</strong>
+        </div>
         <button type="button" className="radar-refresh-button" onClick={props.onRefreshListings} disabled={props.isLoadingListings}>
-          {props.isLoadingListings ? "Scanning..." : "Start scan"}
+          {props.isLoadingListings ? "Se actualizeaza..." : refreshLabel}
         </button>
       </div>
     </header>

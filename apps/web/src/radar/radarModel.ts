@@ -196,7 +196,7 @@ export function buildRadarKpis(
   return [
     { id: "canonical", label: "Anunturi canonice", value: formatCompactNumber.format(listings.length), detail: "listings indexate", tone: "neutral" },
     { id: "changed", label: "Pret schimbat", value: formatCompactNumber.format(changedTodayCount), detail: "in ultimele 24h", tone: changedTodayCount > 0 ? "warning" : "neutral" },
-    { id: "dedup", label: "Dedup candidates", value: formatCompactNumber.format(dedupCandidates), detail: `${Math.round(averageMatchScore * 100)}% score mediu`, tone: dedupCandidates > 0 ? "warning" : "good" },
+    { id: "dedup", label: "Candidati dedup", value: formatCompactNumber.format(dedupCandidates), detail: `${Math.round(averageMatchScore * 100)}% potrivire medie`, tone: dedupCandidates > 0 ? "warning" : "good" },
     { id: "alerts", label: "Alerte trimise", value: formatCompactNumber.format(alertDeliveries.length), detail: `${savedSearches.length} cautari salvate`, tone: "good" },
     { id: "coverage", label: "Source parse coverage", value: `${Math.round(averageCoverage * 100)}%`, detail: `${activeSources}/${sourceHealth.length} surse active`, tone: averageCoverage >= 0.8 ? "good" : "warning" },
     { id: "tti", label: "Time-to-index", value: `${averageTimeToIndex.toFixed(1)} min`, detail: "dashboard metric", tone: averageTimeToIndex <= 5 ? "good" : "warning" }
@@ -229,8 +229,8 @@ export function buildActivityEvents(
     events.push({
       id: `match-${selectedListing.id}`,
       time: latestHistoryPoint?.date ?? "azi",
-      title: "Match creat",
-      detail: `Dedup score ${Math.round(selectedListing.matchScore * 100)}% · ${primarySource?.name ?? "sursa"}`,
+      title: "Legatura sursa",
+      detail: `Potrivire surse ${Math.round(selectedListing.matchScore * 100)}% · ${primarySource?.name ?? "sursa"}`,
       tone: "good"
     });
     events.push({

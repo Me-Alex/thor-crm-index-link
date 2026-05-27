@@ -1,0 +1,106 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 950" preserveAspectRatio="xMidYMid slice">
+  <defs>
+    <radialGradient id="centerGlow" cx="50%" cy="50%" r="55%">
+      <stop offset="0%" stop-color="#16345c" stop-opacity=".58"/>
+      <stop offset="58%" stop-color="#0a1b34" stop-opacity=".22"/>
+      <stop offset="100%" stop-color="#06111f" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#385f9c" stop-opacity="0"/>
+      <stop offset=".5" stop-color="#7ea7e8" stop-opacity=".56"/>
+      <stop offset="1" stop-color="#385f9c" stop-opacity="0"/>
+    </linearGradient>
+    <linearGradient id="river" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#245b9c" stop-opacity=".18"/>
+      <stop offset=".5" stop-color="#36c5ff" stop-opacity=".42"/>
+      <stop offset="1" stop-color="#245b9c" stop-opacity=".18"/>
+    </linearGradient>
+    <filter id="softGlow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <rect width="1600" height="950" fill="transparent"/>
+  <ellipse cx="805" cy="485" rx="650" ry="410" fill="url(#centerGlow)"/>
+
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <ellipse cx="800" cy="500" rx="465" ry="298" stroke="#5b7fb8" stroke-opacity=".28" stroke-width="2"/>
+    <ellipse cx="800" cy="500" rx="305" ry="198" stroke="#5576aa" stroke-opacity=".26" stroke-width="1.6"/>
+    <ellipse cx="800" cy="500" rx="170" ry="112" stroke="#5576aa" stroke-opacity=".22" stroke-width="1.2"/>
+
+    <path d="M145 505 C260 474 355 490 482 516 C610 545 707 535 815 496 C928 455 1039 463 1152 501 C1265 538 1378 528 1492 493" stroke="url(#river)" stroke-width="18" stroke-opacity=".66" filter="url(#softGlow)"/>
+    <path d="M145 505 C260 474 355 490 482 516 C610 545 707 535 815 496 C928 455 1039 463 1152 501 C1265 538 1378 528 1492 493" stroke="#63d8ff" stroke-opacity=".35" stroke-width="2"/>
+
+    <path d="M800 500 L802 54" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L1194 116" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L1510 375" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L1414 824" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L815 924" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L285 858" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L64 630" stroke="url(#road)" stroke-width="4"/>
+    <path d="M800 500 L208 185" stroke="url(#road)" stroke-width="4"/>
+
+    <path d="M310 330 C450 224 612 180 804 190 C982 199 1138 260 1245 377 C1353 495 1369 637 1263 750 C1142 879 949 900 762 854 C568 806 403 730 313 610 C231 500 228 392 310 330Z" stroke="#91b8f6" stroke-opacity=".18" stroke-width="1.4"/>
+    <path d="M393 400 C516 309 657 279 809 285 C953 291 1076 343 1155 431 C1232 517 1237 621 1157 704 C1065 799 913 811 768 777 C611 740 492 678 418 589 C353 510 339 444 393 400Z" stroke="#91b8f6" stroke-opacity=".18" stroke-width="1.2"/>
+
+    <path d="M330 204 C430 318 513 383 662 436 C793 482 944 556 1052 692" stroke="#6f94cf" stroke-opacity=".24" stroke-width="1.8"/>
+    <path d="M454 130 C493 271 558 370 674 458 C784 542 872 669 885 840" stroke="#6f94cf" stroke-opacity=".22" stroke-width="1.5"/>
+    <path d="M1040 98 C986 242 930 365 844 473 C756 583 661 669 512 754" stroke="#6f94cf" stroke-opacity=".24" stroke-width="1.8"/>
+    <path d="M1328 242 C1192 323 1064 391 920 454 C777 517 633 555 436 584" stroke="#6f94cf" stroke-opacity=".22" stroke-width="1.5"/>
+    <path d="M1292 707 C1133 647 1005 588 858 514 C725 448 590 350 452 238" stroke="#6f94cf" stroke-opacity=".2" stroke-width="1.4"/>
+    <path d="M220 735 C367 683 515 626 680 555 C836 488 978 414 1152 280" stroke="#6f94cf" stroke-opacity=".22" stroke-width="1.5"/>
+
+    <g stroke="#9fc6ff" stroke-opacity=".12" stroke-width="1">
+      <path d="M240 424 C386 392 492 398 620 430"/>
+      <path d="M250 556 C391 528 518 532 663 568"/>
+      <path d="M517 241 C578 355 648 436 752 496"/>
+      <path d="M642 151 C646 287 683 407 765 502"/>
+      <path d="M927 175 C898 305 861 410 794 510"/>
+      <path d="M1100 244 C1016 342 929 421 818 502"/>
+      <path d="M1254 551 C1110 529 990 524 830 520"/>
+      <path d="M1182 669 C1053 629 945 584 820 523"/>
+      <path d="M693 806 C726 686 766 599 806 522"/>
+      <path d="M456 694 C574 640 677 594 787 524"/>
+      <path d="M388 292 C500 356 614 409 767 492"/>
+      <path d="M1174 392 C1036 416 924 456 819 505"/>
+    </g>
+  </g>
+
+  <g fill="#2bdca2" opacity=".16">
+    <path d="M562 172 C625 126 724 128 773 184 C724 227 624 231 562 172Z"/>
+    <path d="M968 188 C1033 151 1110 167 1145 224 C1089 262 1010 252 968 188Z"/>
+    <path d="M1002 662 C1071 638 1144 675 1166 740 C1097 765 1025 729 1002 662Z"/>
+    <path d="M340 578 C406 534 487 545 532 610 C471 652 389 646 340 578Z"/>
+  </g>
+
+  <g font-family="Inter, Arial, sans-serif" font-size="23" font-weight="700" letter-spacing="2" text-anchor="middle">
+    <text x="800" y="514" fill="#d8e7ff" opacity=".68">BUCURESTI</text>
+  </g>
+  <g font-family="Inter, Arial, sans-serif" font-size="16" font-weight="700" letter-spacing="1.5" text-anchor="middle" fill="#b7c9e7" opacity=".58">
+    <text x="686" y="145">BANEASA</text>
+    <text x="681" y="303">FLOREASCA</text>
+    <text x="1008" y="315">PIPERA</text>
+    <text x="1050" y="507">TITAN</text>
+    <text x="1092" y="669">DRISTOR</text>
+    <text x="618" y="758">RAHOVA</text>
+    <text x="385" y="590">DRUMUL TABEREI</text>
+    <text x="805" y="402">UNIRII</text>
+    <text x="726" y="610">COTROCENI</text>
+    <text x="912" y="223">AVIATIEI</text>
+  </g>
+
+  <g fill="#7ea7e8" opacity=".34">
+    <circle cx="800" cy="500" r="4"/>
+    <circle cx="686" cy="145" r="3"/>
+    <circle cx="681" cy="303" r="3"/>
+    <circle cx="1008" cy="315" r="3"/>
+    <circle cx="1050" cy="507" r="3"/>
+    <circle cx="1092" cy="669" r="3"/>
+    <circle cx="618" cy="758" r="3"/>
+    <circle cx="385" cy="590" r="3"/>
+  </g>
+</svg>

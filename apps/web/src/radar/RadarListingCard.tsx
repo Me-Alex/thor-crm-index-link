@@ -16,6 +16,7 @@ export function RadarListingCard({ opportunity, selected, onSelect }: RadarListi
   const { listing, priceDeltaEur, priceDeltaPct } = opportunity;
   const deltaTone = priceDeltaEur < 0 ? "is-hot" : priceDeltaEur > 0 ? "is-good" : "";
   const primarySource = listing.sources[0];
+  const propertyIcon = listing.propertyType === "land" ? "◇" : listing.propertyType === "house" ? "⌂" : "▥";
 
   return (
     <article className={`radar-listing-card${selected ? " is-selected" : ""}`}>
@@ -27,12 +28,13 @@ export function RadarListingCard({ opportunity, selected, onSelect }: RadarListi
         onClick={() => onSelect(listing.id)}
       >
         <div className={`radar-listing-visual tone-${listing.propertyType}`}>
+          <i aria-hidden="true">{propertyIcon}</i>
           <span>{listing.neighborhood}</span>
         </div>
         <div className="radar-listing-copy">
           <div className="radar-listing-title-row">
             <strong>{listing.title}</strong>
-            <span className="radar-listing-score">{Math.round(listing.matchScore * 100)}%</span>
+            <span className="radar-listing-score">{Math.round(listing.matchScore * 100)}% potrivire</span>
           </div>
           <div className="radar-listing-meta">
             <span>{formatCurrency.format(listing.priceEur)}</span>

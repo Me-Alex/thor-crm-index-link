@@ -111,6 +111,16 @@ describe("SpatialAppShell", () => {
     expect(screen.getByLabelText(/Spatial nodes mobile/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Canvas minimap/i)).toBeInTheDocument();
   });
+
+  it("uses styled saved search selectors in the utility panel", () => {
+    render(<SpatialAppShell {...buildSpatialShellProps()} />);
+
+    const savedPanel = screen.getByTestId("saved-searches");
+
+    expect(savedPanel.querySelector("select")).toBeNull();
+    fireEvent.click(within(savedPanel).getByRole("button", { name: /Frecventa alerta.*near real-time/i }));
+    expect(within(savedPanel).getByRole("listbox", { name: /Frecventa alerta/i })).toBeInTheDocument();
+  });
 });
 
 function buildSpatialShellProps(

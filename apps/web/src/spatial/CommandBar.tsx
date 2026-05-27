@@ -39,7 +39,7 @@ export function CommandBar({
       <div className="command-actions">
         <span>{dataMessage}</span>
         <button type="button" onClick={onRefreshListings} disabled={isLoadingListings}>
-          {isLoadingListings ? "Scanning..." : "New scan"}
+          {isLoadingListings ? "Se actualizeaza..." : "Actualizeaza"}
         </button>
       </div>
     </header>

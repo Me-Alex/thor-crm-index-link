@@ -1,5 +1,6 @@
 import type { FormEvent } from "react";
 import type { SavedSearch } from "../data/demoData";
+import { RadarSelect, type RadarSelectOption } from "../radar/RadarSelect";
 
 interface SpatialUtilityPanelProps {
   authSessionEmail: string | undefined;
@@ -28,6 +29,18 @@ interface SpatialUtilityPanelProps {
   onSavedSearchEdit: (search: SavedSearch) => void;
   onSavedSearchDelete: (search: SavedSearch) => void;
 }
+
+const savedSearchFrequencyOptions: Array<RadarSelectOption<SavedSearch["frequency"]>> = [
+  { label: "near real-time", value: "near real-time" },
+  { label: "hourly", value: "hourly" },
+  { label: "daily", value: "daily" }
+];
+
+const savedSearchAlertChannelOptions: Array<RadarSelectOption<SavedSearch["alertChannel"]>> = [
+  { label: "in-app", value: "in_app" },
+  { label: "email", value: "email" },
+  { label: "webhook", value: "webhook" }
+];
 
 export function SpatialUtilityPanel({
   authSessionEmail,
@@ -124,28 +137,20 @@ export function SpatialUtilityPanel({
               required
             />
           </label>
-          <label>
-            <span>Frecventa alerta</span>
-            <select
-              value={savedSearchFrequency}
-              onChange={(event) => onSavedSearchFrequencyChange(parseSavedSearchFrequency(event.target.value))}
-            >
-              <option value="near real-time">near real-time</option>
-              <option value="hourly">hourly</option>
-              <option value="daily">daily</option>
-            </select>
-          </label>
-          <label>
-            <span>Canal alerta</span>
-            <select
-              value={savedSearchAlertChannel}
-              onChange={(event) => onSavedSearchAlertChannelChange(parseSavedSearchAlertChannel(event.target.value))}
-            >
-              <option value="in_app">in-app</option>
-              <option value="email">email</option>
-              <option value="webhook">webhook</option>
-            </select>
-          </label>
+          <RadarSelect
+            className="utility-select"
+            label="Frecventa alerta"
+            value={savedSearchFrequency}
+            options={savedSearchFrequencyOptions}
+            onChange={onSavedSearchFrequencyChange}
+          />
+          <RadarSelect
+            className="utility-select"
+            label="Canal alerta"
+            value={savedSearchAlertChannel}
+            options={savedSearchAlertChannelOptions}
+            onChange={onSavedSearchAlertChannelChange}
+          />
           <label className="utility-check">
             <input
               type="checkbox"
@@ -181,12 +186,4 @@ export function SpatialUtilityPanel({
       </section>
     </aside>
   );
-}
-
-function parseSavedSearchFrequency(value: string): SavedSearch["frequency"] {
-  return value === "hourly" || value === "daily" ? value : "near real-time";
-}
-
-function parseSavedSearchAlertChannel(value: string): SavedSearch["alertChannel"] {
-  return value === "email" || value === "webhook" ? value : "in_app";
 }

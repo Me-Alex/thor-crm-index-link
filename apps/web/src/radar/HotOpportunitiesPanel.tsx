@@ -9,20 +9,27 @@ interface HotOpportunitiesPanelProps {
 
 export function HotOpportunitiesPanel({ opportunities, selectedListingId, onSelectListing }: HotOpportunitiesPanelProps) {
   return (
-    <section className="hot-opportunities-panel" data-testid="hot-opportunities" aria-label="Oportunitati fierbinti">
+    <section className="hot-opportunities-panel" data-testid="hot-opportunities" aria-label="Anunturi relevante">
       <div className="panel-heading">
-        <strong>Oportunitati fierbinti</strong>
-        <span>Top {opportunities.length}</span>
+        <strong>Anunturi relevante</strong>
+        <a href="#selected-listing-detail">Vezi toate</a>
       </div>
       <div className="hot-opportunities-list">
-        {opportunities.map((opportunity) => (
-          <RadarListingCard
-            key={opportunity.listing.id}
-            opportunity={opportunity}
-            selected={selectedListingId === opportunity.listing.id}
-            onSelect={onSelectListing}
-          />
-        ))}
+        {opportunities.length > 0 ? (
+          opportunities.map((opportunity) => (
+            <RadarListingCard
+              key={opportunity.listing.id}
+              opportunity={opportunity}
+              selected={selectedListingId === opportunity.listing.id}
+              onSelect={onSelectListing}
+            />
+          ))
+        ) : (
+          <div className="hot-opportunities-empty">
+            <strong>Nu exista anunturi in filtrul curent</strong>
+            <span>Schimba filtrele sau asteapta finalizarea ingestiei pentru sursele active.</span>
+          </div>
+        )}
       </div>
     </section>
   );

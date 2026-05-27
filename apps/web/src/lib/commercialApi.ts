@@ -54,7 +54,9 @@ export async function bootstrapWorkspace(options: BootstrapWorkspaceOptions): Pr
   });
   if (!response.ok) throw new Error(`Workspace onboarding failed with ${response.status}`);
   const body = (await response.json()) as { data?: { org?: { id?: string; slug?: string } } };
-  return { orgId: body.data?.org?.id ?? "", slug: body.data?.org?.slug ?? options.slug };
+  const orgId = body.data?.org?.id;
+  if (!orgId) throw new Error("Workspace onboarding did not return an organization id");
+  return { orgId, slug: body.data?.org?.slug ?? options.slug };
 }
 
 export async function createBillingCheckout(options: CheckoutOptions): Promise<string> {

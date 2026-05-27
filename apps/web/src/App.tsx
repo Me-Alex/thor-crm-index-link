@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   alertDeliveries,
   billingPlans,
@@ -18,6 +18,7 @@ import {
   fetchCommercialReadiness,
   submitComplianceRequest
 } from "./lib/commercialApi";
+import { clearStoredActiveWorkspace, getStoredActiveWorkspace, storeActiveWorkspace, type ActiveWorkspace } from "./lib/activeWorkspace";
 import { fetchWorkerListings, fetchWorkerSourceHealth, resolveWorkerApiBaseUrl } from "./lib/listingsApi";
 import {
   createTenantSavedSearch,
@@ -30,6 +31,7 @@ import {
   getStoredSupabaseAuthSession,
   signInWithSupabasePassword
 } from "./lib/supabaseAuth";
+import { getRuntimeConfig, productionBlockedMessage } from "./lib/runtimeConfig";
 import {
   buildDemoTenantWorkflow,
   createTenantWorkflowNote,
@@ -44,19 +46,28 @@ import {
 import { MarketRadarAppShell } from "./radar/MarketRadarAppShell";
 
 function App() {
-  const [listings, setListings] = useState<DemoListing[]>(demoListings);
+  const runtime = useMemo(getRuntimeConfig, []);
+  const [listings, setListings] = useState<DemoListing[]>(() => (runtime.allowDemoFallback ? demoListings : []));
   const [dataMode, setDataMode] = useState<"fallback" | "live">("fallback");
-  const [dataMessage, setDataMessage] = useState("Se incearca incarcarea din Worker API.");
-  const [sourceHealthCards, setSourceHealthCards] = useState(sourceHealth);
+  const [dataMessage, setDataMessage] = useState(
+    runtime.allowDemoFallback
+      ? "Se incearca incarcarea din Worker API."
+      : "Production mode: dashboardul asteapta date live din Worker API."
+  );
+  const [sourceHealthCards, setSourceHealthCards] = useState(() => (runtime.allowDemoFallback ? sourceHealth : []));
   const [isLoadingListings, setIsLoadingListings] = useState(false);
-  const [savedSearchItems, setSavedSearchItems] = useState<SavedSearch[]>(savedSearches);
+  const [savedSearchItems, setSavedSearchItems] = useState<SavedSearch[]>(() => (runtime.allowDemoFallback ? savedSearches : []));
   const [savedSearchName, setSavedSearchName] = useState("");
   const [savedSearchCriteria, setSavedSearchCriteria] = useState("");
   const [savedSearchFrequency, setSavedSearchFrequency] = useState<SavedSearch["frequency"]>("near real-time");
   const [savedSearchAlertChannel, setSavedSearchAlertChannel] = useState<SavedSearch["alertChannel"]>("in_app");
   const [savedSearchAlertsEnabled, setSavedSearchAlertsEnabled] = useState(true);
   const [editingSavedSearchId, setEditingSavedSearchId] = useState<string | null>(null);
-  const [savedSearchMessage, setSavedSearchMessage] = useState("Saved searches demo: poti crea cautari local.");
+  const [savedSearchMessage, setSavedSearchMessage] = useState(
+    runtime.allowDemoFallback
+      ? "Saved searches demo: poti crea cautari local."
+      : "Production mode: saved searches cer Worker API si login Supabase."
+  );
   const [authSession, setAuthSession] = useState(getStoredSupabaseAuthSession);
   const [authEmail, setAuthEmail] = useState(() => getStoredSupabaseAuthSession()?.email ?? "");
   const [authPassword, setAuthPassword] = useState("");
@@ -68,10 +79,14 @@ function App() {
   });
   const [isAuthLoading, setIsAuthLoading] = useState(false);
   const [workflowItems, setWorkflowItems] = useState<TenantWorkflowItem[]>(() =>
-    buildDemoTenantWorkflow(demoListings, demoTenantId)
+    runtime.allowDemoFallback ? buildDemoTenantWorkflow(demoListings, demoTenantId) : []
   );
   const [workflowMode, setWorkflowMode] = useState<"demo" | "live">("demo");
-  const [workflowMessage, setWorkflowMessage] = useState("Workflow demo: se folosesc listingurile indexate local.");
+  const [workflowMessage, setWorkflowMessage] = useState(
+    runtime.allowDemoFallback
+      ? "Workflow demo: se folosesc listingurile indexate local."
+      : "Production mode: workflow-ul cere backend live si login Supabase."
+  );
   const [workflowActionMessage, setWorkflowActionMessage] = useState("");
   const [isLoadingWorkflow, setIsLoadingWorkflow] = useState(false);
   const [billingPlanItems, setBillingPlanItems] = useState<BillingPlan[]>(billingPlans);
@@ -79,15 +94,32 @@ function App() {
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceSlug, setWorkspaceSlug] = useState("");
   const [billingEmail, setBillingEmail] = useState("");
-  const [onboardingMessage, setOnboardingMessage] = useState("Creeaza un workspace pilot dupa login Supabase.");
-  const [billingMessage, setBillingMessage] = useState("Pilotul poate porni fara checkout; planurile platite cer configurare Stripe.");
+  const [activeWorkspace, setActiveWorkspace] = useState<ActiveWorkspace | null>(getStoredActiveWorkspace);
+  const [onboardingMessage, setOnboardingMessage] = useState(
+    runtime.isProduction
+      ? "Production mode: onboardingul cere Worker API si login Supabase."
+      : "Creeaza un workspace pilot dupa login Supabase."
+  );
+  const [billingMessage, setBillingMessage] = useState(
+    runtime.isProduction
+      ? "Production mode: planurile platite pornesc doar dupa configurarea checkoutului."
+      : "Pilotul poate porni fara checkout; planurile platite cer configurare Stripe."
+  );
   const [complianceEmail, setComplianceEmail] = useState("");
   const [complianceSubject, setComplianceSubject] = useState("");
   const [complianceTargetUrl, setComplianceTargetUrl] = useState("");
   const [complianceDetails, setComplianceDetails] = useState("");
-  const [complianceMessage, setComplianceMessage] = useState("Cererile de takedown/GDPR sunt inregistrate auditabil in backend.");
+  const [complianceMessage, setComplianceMessage] = useState(
+    runtime.isProduction
+      ? "Production mode: cererile Takedown/GDPR trebuie inregistrate in backend."
+      : "Cererile de takedown/GDPR sunt inregistrate auditabil in backend."
+  );
   const [isCommercialActionLoading, setIsCommercialActionLoading] = useState(false);
   const workflowStatusOverrides = useRef(new Map<string, TenantWorkflowStatus>());
+  const activeOrgId = activeWorkspace?.orgId ?? demoOrgId;
+  const activeWorkspaceName = activeWorkspace?.name ?? (runtime.isProduction ? "Workspace neconfigurat" : "Agentia Demo");
+  const activeWorkspaceSubtitle =
+    activeWorkspace?.slug ?? authSession?.email ?? (runtime.isProduction ? "Login necesar" : "Admin");
 
   const applyWorkflowOverrides = (items: TenantWorkflowItem[]) =>
     items.map((item) => {
@@ -102,9 +134,13 @@ function App() {
       if (!isActive()) {
         return;
       }
-      setListings(demoListings);
+      setListings(runtime.allowDemoFallback ? demoListings : []);
       setDataMode("fallback");
-      setDataMessage("Fallback demo: Worker API URL nu este configurat.");
+      setDataMessage(
+        runtime.allowDemoFallback
+          ? "Fallback demo: Worker API URL nu este configurat."
+          : productionBlockedMessage("Worker API URL nu este configurat.")
+      );
       return;
     }
 
@@ -118,9 +154,13 @@ function App() {
       }
 
       if (apiListings.length === 0) {
-        setListings(demoListings);
+        setListings(runtime.allowDemoFallback ? demoListings : []);
         setDataMode("fallback");
-        setDataMessage("Fallback demo: Worker API nu a returnat listinguri.");
+        setDataMessage(
+          runtime.allowDemoFallback
+            ? "Fallback demo: Worker API nu a returnat listinguri."
+            : productionBlockedMessage("Worker API nu a returnat listinguri live.")
+        );
         return;
       }
 
@@ -131,9 +171,13 @@ function App() {
       if (!isActive()) {
         return;
       }
-      setListings(demoListings);
+      setListings(runtime.allowDemoFallback ? demoListings : []);
       setDataMode("fallback");
-      setDataMessage(`Fallback demo: ${error instanceof Error ? error.message : "Worker API indisponibil"}.`);
+      setDataMessage(
+        runtime.allowDemoFallback
+          ? `Fallback demo: ${error instanceof Error ? error.message : "Worker API indisponibil"}.`
+          : productionBlockedMessage(error instanceof Error ? error.message : "Worker API indisponibil.")
+      );
     } finally {
       if (isActive()) {
         setIsLoadingListings(false);
@@ -167,7 +211,7 @@ function App() {
       })
       .catch(() => {
         if (!ignoreResult) {
-          setSourceHealthCards(sourceHealth);
+          setSourceHealthCards(runtime.allowDemoFallback ? sourceHealth : []);
         }
       });
 
@@ -210,7 +254,7 @@ function App() {
       return undefined;
     }
 
-    fetchTenantSavedSearches({ baseUrl: workerApiBaseUrl, orgId: demoOrgId, accessToken })
+    fetchTenantSavedSearches({ baseUrl: workerApiBaseUrl, orgId: activeOrgId, accessToken })
       .then((apiSavedSearches) => {
         if (ignoreResult || apiSavedSearches.length === 0) {
           return;
@@ -221,37 +265,49 @@ function App() {
       })
       .catch(() => {
         if (!ignoreResult) {
-          setSavedSearchMessage("Saved searches demo: backendul nu este disponibil.");
+          setSavedSearchMessage(
+            runtime.allowDemoFallback
+              ? "Saved searches demo: backendul nu este disponibil."
+              : productionBlockedMessage("saved searches backend indisponibil.")
+          );
         }
       });
 
     return () => {
       ignoreResult = true;
     };
-  }, [authSession?.accessToken]);
+  }, [activeOrgId, authSession?.accessToken]);
 
   useEffect(() => {
     let ignoreResult = false;
     const workerApiBaseUrl = resolveWorkerApiBaseUrl();
     const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
-    const fallbackWorkflow = buildDemoTenantWorkflow(listings, demoTenantId);
+    const fallbackWorkflow = runtime.allowDemoFallback ? buildDemoTenantWorkflow(listings, demoTenantId) : [];
 
     setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
 
     if (!workerApiBaseUrl) {
       setWorkflowMode("demo");
-      setWorkflowMessage("Workflow demo: endpointul backend nu este configurat.");
+      setWorkflowMessage(
+        runtime.allowDemoFallback
+          ? "Workflow demo: endpointul backend nu este configurat."
+          : productionBlockedMessage("endpointul backend pentru workflow nu este configurat.")
+      );
       return undefined;
     }
 
     if (!accessToken) {
       setWorkflowMode("demo");
-      setWorkflowMessage("Workflow demo: lipseste tokenul Supabase de utilizator pentru endpointurile tenant.");
+      setWorkflowMessage(
+        runtime.allowDemoFallback
+          ? "Workflow demo: lipseste tokenul Supabase de utilizator pentru endpointurile tenant."
+          : productionBlockedMessage("login Supabase necesar pentru workflow tenant.")
+      );
       return undefined;
     }
 
     setIsLoadingWorkflow(true);
-    fetchTenantWorkflow({ baseUrl: workerApiBaseUrl, orgId: demoOrgId, listings, accessToken })
+    fetchTenantWorkflow({ baseUrl: workerApiBaseUrl, orgId: activeOrgId, listings, accessToken })
       .then((apiWorkflowItems) => {
         if (ignoreResult) {
           return;
@@ -260,7 +316,11 @@ function App() {
         if (apiWorkflowItems.length === 0) {
           setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
           setWorkflowMode("demo");
-          setWorkflowMessage("Workflow demo: endpointul backend a raspuns fara date.");
+          setWorkflowMessage(
+            runtime.allowDemoFallback
+              ? "Workflow demo: endpointul backend a raspuns fara date."
+              : productionBlockedMessage("endpointul workflow a raspuns fara date.")
+          );
           return;
         }
 
@@ -276,7 +336,9 @@ function App() {
         setWorkflowItems(applyWorkflowOverrides(fallbackWorkflow));
         setWorkflowMode("demo");
         setWorkflowMessage(
-          `Workflow demo: ${error instanceof Error ? error.message : "endpoint workflow indisponibil"}.`
+          runtime.allowDemoFallback
+            ? `Workflow demo: ${error instanceof Error ? error.message : "endpoint workflow indisponibil"}.`
+            : productionBlockedMessage(error instanceof Error ? error.message : "endpoint workflow indisponibil.")
         );
       })
       .finally(() => {
@@ -288,7 +350,7 @@ function App() {
     return () => {
       ignoreResult = true;
     };
-  }, [authSession?.accessToken, listings]);
+  }, [activeOrgId, authSession?.accessToken, listings]);
 
   const handleWorkflowStatusChange = async (listingId: string, status: TenantWorkflowStatus) => {
     const fallbackWorkflow = buildDemoTenantWorkflow(listings, demoTenantId);
@@ -300,6 +362,34 @@ function App() {
 
     if (!workflowItem) {
       setWorkflowActionMessage("Nu exista workflow pentru listingul selectat.");
+      return;
+    }
+
+    if (runtime.isProduction) {
+      if (!workerApiBaseUrl || !accessToken) {
+        setWorkflowActionMessage(productionBlockedMessage("workflow-ul cere Worker API si login Supabase; salvarea locala este dezactivata."));
+        return;
+      }
+
+      setWorkflowActionMessage("Se actualizeaza workflow-ul tenantului in backend.");
+      try {
+        await updateTenantWorkflowStatus({
+          baseUrl: workerApiBaseUrl,
+          orgId: workflowItem.orgId,
+          listingId,
+          status,
+          accessToken
+        });
+        workflowStatusOverrides.current.set(listingId, status);
+        setWorkflowItems((currentItems) =>
+          currentItems.map((currentItem) =>
+            currentItem.listingId === listingId ? { ...currentItem, status, updatedAt: new Date().toISOString() } : currentItem
+          )
+        );
+        setWorkflowActionMessage("Workflow salvat in backend.");
+      } catch {
+        setWorkflowActionMessage(productionBlockedMessage("workflow backend indisponibil; salvarea locala este dezactivata."));
+      }
       return;
     }
 
@@ -352,6 +442,35 @@ function App() {
 
     if (!trimmedBody) {
       setWorkflowActionMessage("Nota nu poate fi goala.");
+      return;
+    }
+
+    if (runtime.isProduction) {
+      if (!workflowItem || !workerApiBaseUrl || !accessToken) {
+        setWorkflowActionMessage(productionBlockedMessage("nota cere Worker API si login Supabase; salvarea locala este dezactivata."));
+        return;
+      }
+
+      setWorkflowActionMessage("Se salveaza nota in backend.");
+      try {
+        const apiNote = await createTenantWorkflowNote({
+          baseUrl: workerApiBaseUrl,
+          orgId: workflowItem.orgId,
+          listingId,
+          body: trimmedBody,
+          accessToken
+        });
+        setWorkflowItems((currentItems) =>
+          currentItems.map((currentItem) =>
+            currentItem.listingId === listingId
+              ? { ...currentItem, notes: [apiNote, ...currentItem.notes], updatedAt: apiNote.createdAt }
+              : currentItem
+          )
+        );
+        setWorkflowActionMessage("Nota salvata in backend.");
+      } catch {
+        setWorkflowActionMessage(productionBlockedMessage("workflow notes backend indisponibil; salvarea locala este dezactivata."));
+      }
       return;
     }
 
@@ -414,6 +533,36 @@ function App() {
     const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
 
     if (editingSavedSearchId) {
+      if (runtime.isProduction) {
+        if (!workerApiBaseUrl || !accessToken) {
+          setSavedSearchMessage(productionBlockedMessage("saved searches cer Worker API si login Supabase; salvarea locala este dezactivata."));
+          return;
+        }
+
+        setSavedSearchMessage("Se actualizeaza cautarea in backend.");
+        try {
+          const apiSavedSearch = await updateTenantSavedSearch({
+            baseUrl: workerApiBaseUrl,
+            orgId: activeOrgId,
+            accessToken,
+            searchId: editingSavedSearchId,
+            name: trimmedName,
+            criteria: trimmedCriteria,
+            frequency: savedSearchFrequency,
+            alertChannel: savedSearchAlertChannel,
+            alertsEnabled: savedSearchAlertsEnabled
+          });
+          setSavedSearchItems((currentItems) =>
+            currentItems.map((item) => (item.id === editingSavedSearchId ? apiSavedSearch : item))
+          );
+          resetSavedSearchForm();
+          setSavedSearchMessage("Cautare actualizata in backend.");
+        } catch {
+          setSavedSearchMessage(productionBlockedMessage("saved searches backend indisponibil; salvarea locala este dezactivata."));
+        }
+        return;
+      }
+
       const localUpdate = {
         id: editingSavedSearchId,
         name: trimmedName,
@@ -433,7 +582,7 @@ function App() {
         try {
           const apiSavedSearch = await updateTenantSavedSearch({
             baseUrl: workerApiBaseUrl,
-            orgId: demoOrgId,
+            orgId: activeOrgId,
             accessToken,
             searchId: editingSavedSearchId,
             name: trimmedName,
@@ -449,6 +598,33 @@ function App() {
         } catch {
           setSavedSearchMessage("Cautare actualizata local; backendul nu este disponibil.");
         }
+      }
+      return;
+    }
+
+    if (runtime.isProduction) {
+      if (!workerApiBaseUrl || !accessToken) {
+        setSavedSearchMessage(productionBlockedMessage("saved searches cer Worker API si login Supabase; salvarea locala este dezactivata."));
+        return;
+      }
+
+      setSavedSearchMessage("Se salveaza cautarea in backend.");
+      try {
+        const apiSavedSearch = await createTenantSavedSearch({
+          baseUrl: workerApiBaseUrl,
+          orgId: activeOrgId,
+          accessToken,
+          name: trimmedName,
+          criteria: trimmedCriteria,
+          frequency: savedSearchFrequency,
+          alertChannel: savedSearchAlertChannel,
+          alertsEnabled: savedSearchAlertsEnabled
+        });
+        setSavedSearchItems((currentItems) => [apiSavedSearch, ...currentItems]);
+        resetSavedSearchForm();
+        setSavedSearchMessage("Cautare salvata in backend.");
+      } catch {
+        setSavedSearchMessage(productionBlockedMessage("saved searches backend indisponibil; salvarea locala este dezactivata."));
       }
       return;
     }
@@ -470,7 +646,7 @@ function App() {
       try {
         const apiSavedSearch = await createTenantSavedSearch({
           baseUrl: workerApiBaseUrl,
-          orgId: demoOrgId,
+          orgId: activeOrgId,
           accessToken,
           name: trimmedName,
           criteria: trimmedCriteria,
@@ -499,14 +675,40 @@ function App() {
   };
 
   const handleSavedSearchDelete = async (search: SavedSearch) => {
+    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
+    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
+
+    if (runtime.isProduction) {
+      if (!workerApiBaseUrl || !accessToken || search.id.startsWith("local-")) {
+        setSavedSearchMessage(productionBlockedMessage("saved searches cer Worker API si login Supabase; stergerea locala este dezactivata."));
+        return;
+      }
+
+      setSavedSearchMessage("Se sterge cautarea din backend.");
+      try {
+        await deleteTenantSavedSearch({
+          baseUrl: workerApiBaseUrl,
+          orgId: activeOrgId,
+          accessToken,
+          searchId: search.id
+        });
+        setSavedSearchItems((currentItems) => currentItems.filter((item) => item.id !== search.id));
+        if (editingSavedSearchId === search.id) {
+          resetSavedSearchForm();
+        }
+        setSavedSearchMessage("Cautare stearsa din backend.");
+      } catch {
+        setSavedSearchMessage(productionBlockedMessage("saved searches backend indisponibil; stergerea locala este dezactivata."));
+      }
+      return;
+    }
+
     setSavedSearchItems((currentItems) => currentItems.filter((item) => item.id !== search.id));
     if (editingSavedSearchId === search.id) {
       resetSavedSearchForm();
     }
     setSavedSearchMessage("Cautare stearsa local.");
 
-    const workerApiBaseUrl = resolveWorkerApiBaseUrl();
-    const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
     if (!workerApiBaseUrl || !accessToken || search.id.startsWith("local-")) {
       return;
     }
@@ -514,7 +716,7 @@ function App() {
     try {
       await deleteTenantSavedSearch({
         baseUrl: workerApiBaseUrl,
-        orgId: demoOrgId,
+        orgId: activeOrgId,
         accessToken,
         searchId: search.id
       });
@@ -547,9 +749,15 @@ function App() {
 
   const handleSupabaseLogout = () => {
     clearSupabaseAuthSession();
+    clearStoredActiveWorkspace();
     setAuthSession(null);
+    setActiveWorkspace(null);
     setAuthPassword("");
-    setAuthMessage("Delogat: workflow-ul ramane in demo pana la un nou login Supabase.");
+    setAuthMessage(
+      runtime.isProduction
+        ? "Delogat: workflow-ul este blocat pana la un nou login Supabase."
+        : "Delogat: workflow-ul ramane in demo pana la un nou login Supabase."
+    );
   };
 
   const handleWorkspaceSubmit = async (event: FormEvent<HTMLFormElement>) => {
@@ -564,7 +772,11 @@ function App() {
       return;
     }
     if (!workerApiBaseUrl || !accessToken) {
-      setOnboardingMessage("Onboarding demo: lipseste Worker API URL sau login Supabase.");
+      setOnboardingMessage(
+        runtime.isProduction
+          ? productionBlockedMessage("onboardingul cere Worker API si login Supabase.")
+          : "Onboarding demo: lipseste Worker API URL sau login Supabase."
+      );
       return;
     }
 
@@ -578,6 +790,16 @@ function App() {
         slug: normalizedSlug,
         billingEmail: billingEmail.trim() || authSession?.email || ""
       });
+      const nextWorkspace = {
+        orgId: workspace.orgId,
+        name: normalizedName,
+        slug: workspace.slug,
+        ...(billingEmail.trim() || authSession?.email
+          ? { billingEmail: billingEmail.trim() || authSession?.email || "" }
+          : {})
+      };
+      setActiveWorkspace(nextWorkspace);
+      storeActiveWorkspace(nextWorkspace);
       setWorkspaceSlug(workspace.slug);
       setOnboardingMessage(`Workspace pilot creat: ${workspace.slug}.`);
     } catch (error) {
@@ -596,7 +818,11 @@ function App() {
     const workerApiBaseUrl = resolveWorkerApiBaseUrl();
     const accessToken = authSession?.accessToken ?? resolveTenantWorkflowAccessToken();
     if (!workerApiBaseUrl || !accessToken) {
-      setBillingMessage("Checkout demo: lipseste Worker API URL sau login Supabase.");
+      setBillingMessage(
+        runtime.isProduction
+          ? productionBlockedMessage("checkoutul cere Worker API si login Supabase.")
+          : "Checkout demo: lipseste Worker API URL sau login Supabase."
+      );
       return;
     }
 
@@ -606,7 +832,7 @@ function App() {
       const checkoutUrl = await createBillingCheckout({
         baseUrl: workerApiBaseUrl,
         accessToken,
-        orgId: demoOrgId,
+        orgId: activeOrgId,
         plan: plan.id === "scale" ? "scale" : "pro"
       });
       window.location.assign(checkoutUrl);
@@ -621,7 +847,11 @@ function App() {
     event.preventDefault();
     const workerApiBaseUrl = resolveWorkerApiBaseUrl();
     if (!workerApiBaseUrl) {
-      setComplianceMessage("Compliance demo: Worker API URL nu este configurat.");
+      setComplianceMessage(
+        runtime.isProduction
+          ? productionBlockedMessage("compliance backend nu este configurat.")
+          : "Compliance demo: Worker API URL nu este configurat."
+      );
       return;
     }
 
@@ -653,15 +883,18 @@ function App() {
       sourceHealth={sourceHealthCards}
       workflowItems={workflowItems}
       savedSearches={savedSearchItems}
-      alertDeliveries={alertDeliveries}
+      alertDeliveries={runtime.allowDemoFallback ? alertDeliveries : []}
       dataMode={dataMode}
       dataMessage={dataMessage}
       workflowMode={workflowMode}
+      runtimeMode={runtime.mode}
       workflowMessage={workflowMessage}
       workflowActionMessage={workflowActionMessage}
       isLoadingListings={isLoadingListings}
       isLoadingWorkflow={isLoadingWorkflow}
       authSessionEmail={authSession?.email ?? undefined}
+      activeWorkspaceName={activeWorkspaceName}
+      activeWorkspaceSubtitle={activeWorkspaceSubtitle}
       authEmail={authEmail}
       authPassword={authPassword}
       authMessage={authMessage}
