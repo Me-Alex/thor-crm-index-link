@@ -4,14 +4,25 @@ import { RadarListingCard } from "./RadarListingCard";
 interface HotOpportunitiesPanelProps {
   opportunities: RadarOpportunity[];
   selectedListingId: string | undefined;
+  title?: string;
+  summary?: string;
   onSelectListing: (listingId: string) => void;
 }
 
-export function HotOpportunitiesPanel({ opportunities, selectedListingId, onSelectListing }: HotOpportunitiesPanelProps) {
+export function HotOpportunitiesPanel({
+  opportunities,
+  selectedListingId,
+  title = "Anunturi relevante",
+  summary,
+  onSelectListing
+}: HotOpportunitiesPanelProps) {
   return (
-    <section className="hot-opportunities-panel" data-testid="hot-opportunities" aria-label="Anunturi relevante">
+    <section className="hot-opportunities-panel" data-testid="hot-opportunities" aria-label={title}>
       <div className="panel-heading">
-        <strong>Anunturi relevante</strong>
+        <div>
+          <strong>{title}</strong>
+          {summary ? <span>{summary}</span> : null}
+        </div>
         <a href="#selected-listing-detail">Vezi toate</a>
       </div>
       <div className="hot-opportunities-list">

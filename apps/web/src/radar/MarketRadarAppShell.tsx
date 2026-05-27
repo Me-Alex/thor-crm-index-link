@@ -18,7 +18,7 @@ import { MarketMap } from "./MarketMap";
 import { RadarCommandBar } from "./RadarCommandBar";
 import { RadarKpiStrip } from "./RadarKpiStrip";
 import { RadarSelect, type RadarSelectOption } from "./RadarSelect";
-import { buildRadarViewModel, type RadarFilters, type RadarSelectionTarget } from "./radarModel";
+import { buildRadarViewModel, type RadarFilters, type RadarOpportunity, type RadarSelectionTarget } from "./radarModel";
 import { RadarSidebar } from "./RadarSidebar";
 import "./radarStyles.css";
 import { SelectedListingDrawer } from "./SelectedListingDrawer";
@@ -113,6 +113,8 @@ const savedSearchAlertChannelOptions: Array<RadarSelectOption<SavedSearch["alert
 ];
 
 type RadarPageId = "monitor" | "listings" | "saved-searches" | "alerts" | "sources" | "dedup" | "settings";
+type ListingWorkTabId = "all" | "changed" | "open-workflow" | "dedup-review";
+type SourceHealthTabId = "overview" | "issues" | "all";
 
 const pageCopy: Record<RadarPageId, { eyebrow: string; title: string; description: string }> = {
   monitor: {
@@ -152,10 +154,20 @@ const pageCopy: Record<RadarPageId, { eyebrow: string; title: string; descriptio
   }
 };
 
+const listingWorkTabs: Array<{ id: ListingWorkTabId; label: string; description: string }> = [
+  { id: "all", label: "Toate", description: "lista filtrata" },
+  { id: "changed", label: "Pret schimbat", description: "prioritate azi" },
+  { id: "open-workflow", label: "Workflow deschis", description: "necesita actiune" },
+  { id: "dedup-review", label: "Dedup review", description: "scor sub 90%" }
+];
+
+const fallbackListingWorkTab = listingWorkTabs[0] as (typeof listingWorkTabs)[number];
+
 export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
   const [filters, setFilters] = useState<RadarFilters>(defaultFilters);
   const deferredQuery = useDeferredValue(filters.query);
   const [activePage, setActivePage] = useState<RadarPageId>("monitor");
+  const [activeListingWorkTab, setActiveListingWorkTab] = useState<ListingWorkTabId>("all");
   const [isAccountPanelOpen, setIsAccountPanelOpen] = useState(false);
   const [selectedTarget, setSelectedTarget] = useState<RadarSelectionTarget | null>(
     props.listings[0] ? { type: "listing", id: props.listings[0].id } : null
@@ -192,6 +204,13 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
     setActivePage("listings");
   };
 
+  const handleDrawerListingSelect = (listingId: string) => {
+    setSelectedTarget({ type: "listing", id: listingId });
+    if (activePage !== "dedup") {
+      setActivePage("listings");
+    }
+  };
+
   const handlePageNavigate = (pageId: string) => {
     setActivePage(pageId as RadarPageId);
     if (!window.navigator.userAgent.toLowerCase().includes("jsdom")) {
@@ -201,6 +220,9 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
 
   const currentPage = pageCopy[activePage];
   const showCommandBar = activePage === "monitor" || activePage === "listings";
+  const listingWorkTabCounts = buildListingWorkTabCounts(viewModel.opportunities);
+  const listingWorkTabOpportunities = filterListingWorkTabOpportunities(viewModel.opportunities, activeListingWorkTab);
+  const activeListingWorkTabCopy = listingWorkTabs.find((tab) => tab.id === activeListingWorkTab) ?? fallbackListingWorkTab;
 
   return (
     <main className="radar-shell" data-testid="market-radar-shell">
@@ -312,9 +334,17 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
               <HotOpportunitiesPanel
                 opportunities={viewModel.opportunities}
                 selectedListingId={viewModel.selectedListing?.id}
+                summary="selectie din monitor"
                 onSelectListing={handleListingSelect}
               />
             </div>
+            <OperatorCommandCenter
+              opportunities={viewModel.opportunities}
+              sources={viewModel.sourceHealthSummary}
+              savedSearches={props.savedSearches}
+              readinessGates={props.readinessGates}
+              onNavigate={handlePageNavigate}
+            />
           </div>
         </div>
         ) : null}
@@ -323,12 +353,23 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
         <div className={`radar-detail-grid${activePage === "dedup" ? " is-dedup-page" : ""}`} aria-label="Listing workflow and operations">
           {activePage === "listings" ? (
             <div className="radar-operations-column">
+              <ListingWorkTabs
+                activeTab={activeListingWorkTab}
+                counts={listingWorkTabCounts}
+                onTabChange={setActiveListingWorkTab}
+              />
+              <ListingWorkSummary opportunities={viewModel.opportunities} />
               <HotOpportunitiesPanel
-                opportunities={viewModel.opportunities}
+                opportunities={listingWorkTabOpportunities}
                 selectedListingId={viewModel.selectedListing?.id}
+                title={activeListingWorkTabCopy.label}
+                summary={activeListingWorkTabCopy.description}
                 onSelectListing={handleListingSelect}
               />
             </div>
+          ) : null}
+          {activePage === "dedup" ? (
+            <DedupAuditCockpit listing={viewModel.selectedListing} opportunities={viewModel.opportunities} />
           ) : null}
           <SelectedListingDrawer
             listing={viewModel.selectedListing}
@@ -339,7 +380,8 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
             workflowMessage={props.workflowMessage}
             workflowActionMessage={props.workflowActionMessage}
             isLoadingWorkflow={props.isLoadingWorkflow}
-            onSelectListing={handleListingSelect}
+            showListingNavigation={activePage === "dedup"}
+            onSelectListing={handleDrawerListingSelect}
             onWorkflowStatusChange={props.onWorkflowStatusChange}
             onWorkflowNoteCreate={props.onWorkflowNoteCreate}
           />
@@ -374,6 +416,7 @@ export function MarketRadarAppShell(props: MarketRadarAppShellProps) {
             <div className="alerts-dashboard-grid">
               <ActivityTimeline events={viewModel.events} />
               <AlertDeliveryPanel deliveries={props.alertDeliveries} />
+              <AlertOpsPanel deliveries={props.alertDeliveries} savedSearches={props.savedSearches} />
             </div>
             <RadarKpiStrip kpis={viewModel.kpis} />
           </div>
@@ -433,9 +476,246 @@ interface AccountAccessPanelProps {
   compact?: boolean;
 }
 
+interface ListingWorkTabsProps {
+  activeTab: ListingWorkTabId;
+  counts: Record<ListingWorkTabId, number>;
+  onTabChange: (tabId: ListingWorkTabId) => void;
+}
+
+function ListingWorkTabs({ activeTab, counts, onTabChange }: ListingWorkTabsProps) {
+  return (
+    <section className="listing-work-tabs" aria-label="Filtre lucru anunturi" data-testid="listing-work-tabs">
+      {listingWorkTabs.map((tab) => (
+        <button
+          key={tab.id}
+          type="button"
+          className={activeTab === tab.id ? "is-active" : ""}
+          aria-pressed={activeTab === tab.id}
+          onClick={() => onTabChange(tab.id)}
+        >
+          <span>{tab.label}</span>
+          <strong>{counts[tab.id]}</strong>
+          <small>{tab.description}</small>
+        </button>
+      ))}
+    </section>
+  );
+}
+
+function ListingWorkSummary({ opportunities }: { opportunities: RadarOpportunity[] }) {
+  const changedCount = opportunities.filter((opportunity) => opportunity.listing.changedToday).length;
+  const openWorkflowCount = opportunities.filter((opportunity) =>
+    ["Nou", "In lucru"].includes(opportunity.listing.status)
+  ).length;
+  const reviewCount = opportunities.filter((opportunity) => opportunity.listing.matchScore < 0.9).length;
+
+  return (
+    <section className="listing-work-summary" aria-label="Rezumat lucru anunturi">
+      <article>
+        <span>Actiuni azi</span>
+        <strong>{changedCount + openWorkflowCount}</strong>
+        <small>pret schimbat + workflow</small>
+      </article>
+      <article>
+        <span>Dedup review</span>
+        <strong>{reviewCount}</strong>
+        <small>sub prag 90%</small>
+      </article>
+      <article>
+        <span>Index + link</span>
+        <strong>{opportunities.length}</strong>
+        <small>fara re-hosting continut</small>
+      </article>
+    </section>
+  );
+}
+
+function buildListingWorkTabCounts(opportunities: RadarOpportunity[]): Record<ListingWorkTabId, number> {
+  return {
+    all: opportunities.length,
+    changed: filterListingWorkTabOpportunities(opportunities, "changed").length,
+    "open-workflow": filterListingWorkTabOpportunities(opportunities, "open-workflow").length,
+    "dedup-review": filterListingWorkTabOpportunities(opportunities, "dedup-review").length
+  };
+}
+
+function filterListingWorkTabOpportunities(opportunities: RadarOpportunity[], tabId: ListingWorkTabId) {
+  if (tabId === "changed") {
+    return opportunities.filter((opportunity) => opportunity.listing.changedToday);
+  }
+
+  if (tabId === "open-workflow") {
+    return opportunities.filter((opportunity) => ["Nou", "In lucru"].includes(opportunity.listing.status));
+  }
+
+  if (tabId === "dedup-review") {
+    return opportunities.filter((opportunity) => opportunity.listing.matchScore < 0.9);
+  }
+
+  return opportunities;
+}
+
+function DedupAuditCockpit({
+  listing,
+  opportunities
+}: {
+  listing: DemoListing | undefined;
+  opportunities: RadarOpportunity[];
+}) {
+  const reviewQueue = opportunities.filter((opportunity) => opportunity.listing.matchScore < 0.9).length;
+  const selectedSourceCount = listing?.sources.length ?? 0;
+  const selectedHistoryCount = listing?.history.length ?? 0;
+  const recommendation = getDedupRecommendation(listing);
+
+  return (
+    <section className="operations-panel dedup-audit-cockpit" data-testid="dedup-audit-cockpit">
+      <div className="drawer-section-header">
+        <strong>Dedup audit cockpit</strong>
+        <span>{reviewQueue} review</span>
+      </div>
+      <div className="dedup-audit-grid">
+        <article>
+          <span>Scor selectie</span>
+          <strong>{listing ? `${Math.round(listing.matchScore * 100)}%` : "—"}</strong>
+          <small>{recommendation.tone}</small>
+        </article>
+        <article>
+          <span>Surse asociate</span>
+          <strong>{selectedSourceCount}</strong>
+          <small>link-uri auditabile</small>
+        </article>
+        <article>
+          <span>Istoric pret</span>
+          <strong>{selectedHistoryCount}</strong>
+          <small>observatii disponibile</small>
+        </article>
+      </div>
+      <div className={`dedup-recommendation is-${recommendation.level}`}>
+        <span>Recomandare</span>
+        <strong>{recommendation.title}</strong>
+        <p>{recommendation.detail}</p>
+      </div>
+      <div className="dedup-checklist" aria-label="Checklist audit dedup">
+        <article>
+          <strong>1. Verifica overlap surse</strong>
+          <span>Compara linkurile sursa si semnalele care au produs canonical listing.</span>
+        </article>
+        <article>
+          <strong>2. Confirma campurile stabile</strong>
+          <span>Zona, camere, suprafata si pret trebuie sa fie compatibile inainte de merge.</span>
+        </article>
+        <article>
+          <strong>3. Pastreaza false negatives</strong>
+          <span>Daca semnalele sunt slabe, lasa listing-ul separat pana exista dovada mai buna.</span>
+        </article>
+      </div>
+    </section>
+  );
+}
+
+function getDedupRecommendation(listing: DemoListing | undefined) {
+  if (!listing) {
+    return {
+      detail: "Selecteaza un listing pentru audit.",
+      level: "review",
+      title: "Nu exista selectie",
+      tone: "neutru"
+    };
+  }
+
+  if (listing.matchScore >= 0.9 && listing.sources.length > 1) {
+    return {
+      detail: "Scorul si numarul de surse sustin pastrarea legaturii canonice.",
+      level: "safe",
+      title: "Link canonic stabil",
+      tone: "risc scazut"
+    };
+  }
+
+  if (listing.matchScore >= 0.85) {
+    return {
+      detail: "Scorul este aproape de prag; verifica manual campurile care pot produce fals-pozitive.",
+      level: "review",
+      title: "Review manual inainte de merge",
+      tone: "risc mediu"
+    };
+  }
+
+  return {
+    detail: "Semnalele sunt insuficiente pentru unificare automata in MVP.",
+    level: "hold",
+    title: "Pastreaza separat",
+    tone: "risc ridicat"
+  };
+}
+
+function OperatorCommandCenter({
+  opportunities,
+  sources,
+  savedSearches,
+  readinessGates,
+  onNavigate
+}: {
+  opportunities: RadarOpportunity[];
+  sources: SourceHealth[];
+  savedSearches: SavedSearch[];
+  readinessGates: CommercialReadinessGate[];
+  onNavigate: (pageId: RadarPageId) => void;
+}) {
+  const degradedSources = sources.filter((source) => source.mode !== "on").length;
+  const dedupReviewCount = opportunities.filter((opportunity) => opportunity.listing.matchScore < 0.9).length;
+  const blockedGates = readinessGates.filter((gate) => gate.status !== "ready").length;
+
+  return (
+    <section className="operator-command-panel" data-testid="operator-command-center" aria-label="Command center operational">
+      <div className="panel-heading">
+        <div>
+          <strong>Command center</strong>
+          <span>urmatorul pas recomandat</span>
+        </div>
+      </div>
+      <div className="operator-command-list">
+        <article className={degradedSources > 0 ? "is-warning" : "is-ok"}>
+          <span>{degradedSources}</span>
+          <div>
+            <strong>Surse de verificat</strong>
+            <p>{degradedSources > 0 ? "Exista surse degradate sau oprite." : "Sursele principale ruleaza in parametri."}</p>
+          </div>
+          <button type="button" onClick={() => onNavigate("sources")}>
+            Deschide surse
+          </button>
+        </article>
+        <article className={dedupReviewCount > 0 ? "is-warning" : "is-ok"}>
+          <span>{dedupReviewCount}</span>
+          <div>
+            <strong>Dedup de revizuit</strong>
+            <p>{dedupReviewCount > 0 ? "Anunturi sub pragul conservator de potrivire." : "Nu exista candidati sub prag in filtrul curent."}</p>
+          </div>
+          <button type="button" onClick={() => onNavigate("dedup")}>
+            Verifica dedup
+          </button>
+        </article>
+        <article className={savedSearches.length > 0 ? "is-ok" : "is-warning"}>
+          <span>{savedSearches.length}</span>
+          <div>
+            <strong>Cautari salvate</strong>
+            <p>{blockedGates > 0 ? `${blockedGates} gate-uri production necesita atentie.` : "Alertele pot fi operate din workspace."}</p>
+          </div>
+          <button type="button" onClick={() => onNavigate("saved-searches")}>
+            Gestioneaza alerte
+          </button>
+        </article>
+      </div>
+    </section>
+  );
+}
+
 function SourceHealthPanel({ sources }: { sources: SourceHealth[] }) {
+  const [activeTab, setActiveTab] = useState<SourceHealthTabId>("overview");
   const activeSources = sources.filter((source) => source.mode === "on").length;
   const degradedSources = sources.filter((source) => source.mode === "degraded").length;
+  const issueSources = getSourceIssueSources(sources);
+  const actionCount = buildSourceActions(sources).filter((action) => action.priority !== "ok").length;
   const averageCoverage = sources.length
     ? Math.round((sources.reduce((total, source) => total + source.fieldCoverageRate, 0) / sources.length) * 100)
     : 0;
@@ -449,50 +729,119 @@ function SourceHealthPanel({ sources }: { sources: SourceHealth[] }) {
         <strong>Sanatate surse</strong>
         <span>{sources.length} surse</span>
       </div>
-      <div className="source-health-summary">
-        <article>
-          <span>Surse active</span>
-          <strong>{activeSources}</strong>
-          <small>{degradedSources} degradate</small>
-        </article>
-        <article>
-          <span>Coverage mediu</span>
-          <strong>{averageCoverage}%</strong>
-          <small>campuri cheie parsate</small>
-        </article>
-        <article>
-          <span>Time-to-index</span>
-          <strong>{averageTimeToIndex.toFixed(1)} min</strong>
-          <small>medie operationala</small>
-        </article>
+      <div className="source-health-tabs" aria-label="Taburi sanatate surse">
+        <button type="button" className={activeTab === "overview" ? "is-active" : ""} onClick={() => setActiveTab("overview")}>
+          Overview
+        </button>
+        <button type="button" className={activeTab === "issues" ? "is-active" : ""} onClick={() => setActiveTab("issues")}>
+          Issues <span>{actionCount}</span>
+        </button>
+        <button type="button" className={activeTab === "all" ? "is-active" : ""} onClick={() => setActiveTab("all")}>
+          Toate sursele
+        </button>
       </div>
-      <SourceActionQueue sources={sources} />
-      <div className="source-health-grid">
-        {sources.map((source) => (
-          <article key={source.id} className={`source-health-card is-${source.mode}`}>
+
+      {activeTab === "overview" ? (
+        <>
+          <div className="source-health-summary">
+            <article>
+              <span>Surse active</span>
+              <strong>{activeSources}</strong>
+              <small>{degradedSources} degradate</small>
+            </article>
+            <article>
+              <span>Coverage mediu</span>
+              <strong>{averageCoverage}%</strong>
+              <small>campuri cheie parsate</small>
+            </article>
+            <article>
+              <span>Time-to-index</span>
+              <strong>{averageTimeToIndex.toFixed(1)} min</strong>
+              <small>medie operationala</small>
+            </article>
+          </div>
+          <SourceActionQueue sources={sources} />
+        </>
+      ) : null}
+
+      {activeTab === "issues" ? (
+        <>
+          <SourceActionQueue sources={sources} />
+          <SourceRunbookPanel sources={issueSources.length > 0 ? issueSources : sources} />
+          <SourceHealthCards sources={issueSources.length > 0 ? issueSources : sources} />
+        </>
+      ) : null}
+
+      {activeTab === "all" ? <SourceHealthCards sources={sources} /> : null}
+    </section>
+  );
+}
+
+function SourceHealthCards({ sources }: { sources: SourceHealth[] }) {
+  return (
+    <div className="source-health-grid">
+      {sources.map((source) => (
+        <article key={source.id} className={`source-health-card is-${source.mode}`}>
+          <div>
+            <strong>{source.name}</strong>
+            <span>{source.mode}</span>
+          </div>
+          <dl>
             <div>
-              <strong>{source.name}</strong>
-              <span>{source.mode}</span>
+              <dt>Parse success</dt>
+              <dd>{Math.round(source.parseSuccessRate * 100)}%</dd>
             </div>
-            <dl>
-              <div>
-                <dt>Parse success</dt>
-                <dd>{Math.round(source.parseSuccessRate * 100)}%</dd>
-              </div>
-              <div>
-                <dt>Coverage</dt>
-                <dd>{Math.round(source.fieldCoverageRate * 100)}%</dd>
-              </div>
-              <div>
-                <dt>Time-to-index</dt>
-                <dd>{source.timeToIndexMinutes.toFixed(1)} min</dd>
-              </div>
-            </dl>
-          </article>
-        ))}
+            <div>
+              <dt>Coverage</dt>
+              <dd>{Math.round(source.fieldCoverageRate * 100)}%</dd>
+            </div>
+            <div>
+              <dt>Time-to-index</dt>
+              <dd>{source.timeToIndexMinutes.toFixed(1)} min</dd>
+            </div>
+          </dl>
+        </article>
+      ))}
+    </div>
+  );
+}
+
+function SourceRunbookPanel({ sources }: { sources: SourceHealth[] }) {
+  const primarySource =
+    sources
+      .slice()
+      .sort((left, right) => sourceOperationalRiskScore(right) - sourceOperationalRiskScore(left))[0] ?? sources[0];
+
+  return (
+    <section className="source-runbook-panel" data-testid="source-runbook-panel" aria-label="Runbook sursa">
+      <div className="drawer-section-header">
+        <strong>Runbook sursa</strong>
+        <span>{primarySource?.name ?? "n/a"}</span>
+      </div>
+      <div className="source-runbook-steps">
+        <article>
+          <strong>1. Reduce ritmul</strong>
+          <span>Pastreaza politeness, backoff si circuit breaker; nu implementa bypass tehnic.</span>
+        </article>
+        <article>
+          <strong>2. Rejoaca fixture parser</strong>
+          <span>Valideaza coverage pe HTML permis inainte de a creste din nou frecventa.</span>
+        </article>
+        <article>
+          <strong>3. Marcheaza degraded/off</strong>
+          <span>Daca sursa ramane instabila, opreste joburile noi si pastreaza dead-letter pentru audit.</span>
+        </article>
       </div>
     </section>
   );
+}
+
+function getSourceIssueSources(sources: SourceHealth[]) {
+  return sources.filter((source) => source.mode !== "on" || source.fieldCoverageRate < 0.75 || source.timeToIndexMinutes > 8);
+}
+
+function sourceOperationalRiskScore(source: SourceHealth) {
+  return Number(source.mode !== "on") * 100 + Math.max(0, 0.75 - source.fieldCoverageRate) * 100 + Math.max(0, source.timeToIndexMinutes - 8);
 }
 
 interface SourceActionItem {
@@ -593,6 +942,60 @@ function AlertDeliveryPanel({ deliveries }: { deliveries: AlertDelivery[] }) {
             <em>{delivery.status}</em>
           </article>
         ))}
+      </div>
+    </section>
+  );
+}
+
+function AlertOpsPanel({
+  deliveries,
+  savedSearches
+}: {
+  deliveries: AlertDelivery[];
+  savedSearches: SavedSearch[];
+}) {
+  const sentCount = deliveries.filter((delivery) => delivery.status === "sent").length;
+  const pendingCount = deliveries.filter((delivery) => delivery.status === "pending").length;
+  const failedCount = deliveries.filter((delivery) => delivery.status === "failed").length;
+  const activeSearches = savedSearches.filter((search) => search.alertsEnabled).length;
+  const channels = Array.from(new Set(deliveries.map((delivery) => delivery.channel))).join(", ") || "in-app";
+
+  return (
+    <section className="operations-panel alert-ops-panel" data-testid="alert-ops-panel">
+      <div className="drawer-section-header">
+        <strong>Alert operations</strong>
+        <span>{activeSearches} active</span>
+      </div>
+      <div className="alert-ops-grid">
+        <article>
+          <span>Sent</span>
+          <strong>{sentCount}</strong>
+          <small>livrari confirmate</small>
+        </article>
+        <article>
+          <span>Retry queue</span>
+          <strong>{pendingCount + failedCount}</strong>
+          <small>pending + failed</small>
+        </article>
+        <article>
+          <span>Canale</span>
+          <strong>{channels}</strong>
+          <small>configurate in livrari</small>
+        </article>
+      </div>
+      <div className="alert-route-list">
+        <article className={pendingCount > 0 ? "is-warning" : "is-ok"}>
+          <strong>Pending delivery</strong>
+          <span>{pendingCount > 0 ? "Verifica job queue si backoff inainte de retrimitere." : "Nu exista livrari pending in demo."}</span>
+        </article>
+        <article className={failedCount > 0 ? "is-danger" : "is-ok"}>
+          <strong>Failed delivery</strong>
+          <span>{failedCount > 0 ? "Necesita inspectie pe canal si payload." : "Nu exista livrari esuate."}</span>
+        </article>
+        <article className={activeSearches > 0 ? "is-ok" : "is-warning"}>
+          <strong>Saved search coverage</strong>
+          <span>{activeSearches > 0 ? "Cautarile active pot produce alerte." : "Nu exista cautari active pentru alerte."}</span>
+        </article>
       </div>
     </section>
   );

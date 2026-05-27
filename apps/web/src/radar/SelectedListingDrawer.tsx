@@ -13,6 +13,7 @@ interface SelectedListingDrawerProps {
   workflowMessage: string;
   workflowActionMessage: string;
   isLoadingWorkflow: boolean;
+  showListingNavigation?: boolean;
   onSelectListing: (listingId: string) => void;
   onWorkflowStatusChange: (listingId: string, status: TenantWorkflowStatus) => void;
   onWorkflowNoteCreate: (listingId: string, body: string) => void;
@@ -44,6 +45,7 @@ export function SelectedListingDrawer(props: SelectedListingDrawerProps) {
   const [noteDraft, setNoteDraft] = useState("");
   const [activeDetailsTab, setActiveDetailsTab] = useState<"cluster" | "all" | "history">("cluster");
   const selectedListing = props.listing;
+  const showListingNavigation = props.showListingNavigation ?? true;
   const selectedZone = selectedListing
     ? selectedListing.neighborhood || selectedListing.district || selectedListing.city || props.cluster?.label || "Zona necunoscuta"
     : (props.cluster?.label ?? "Cluster");
@@ -70,14 +72,16 @@ export function SelectedListingDrawer(props: SelectedListingDrawerProps) {
           <span>Detalii selectie · {props.cluster?.label ?? props.listing?.neighborhood ?? "Cluster"}</span>
           <strong>{selectedListing ? `${selectedZone} cluster` : "Cluster"}</strong>
         </div>
-        <RadarSelect
-          className="drawer-listing-switcher"
-          label="Selecteaza anunt"
-          value={props.listing?.id ?? ""}
-          options={props.availableListings.map((listing) => ({ label: listing.title, value: listing.id }))}
-          onChange={props.onSelectListing}
-          disabled={props.availableListings.length === 0}
-        />
+        {showListingNavigation ? (
+          <RadarSelect
+            className="drawer-listing-switcher"
+            label="Selecteaza anunt"
+            value={props.listing?.id ?? ""}
+            options={props.availableListings.map((listing) => ({ label: listing.title, value: listing.id }))}
+            onChange={props.onSelectListing}
+            disabled={props.availableListings.length === 0}
+          />
+        ) : null}
       </div>
 
       {selectedListing ? (
@@ -92,14 +96,16 @@ export function SelectedListingDrawer(props: SelectedListingDrawerProps) {
               >
                 Cluster
               </button>
-              <button
-                type="button"
-                className={activeDetailsTab === "all" ? "is-active" : ""}
-                aria-pressed={activeDetailsTab === "all"}
-                onClick={() => setActiveDetailsTab("all")}
-              >
-                View all ({props.cluster?.count ?? props.availableListings.length})
-              </button>
+              {showListingNavigation ? (
+                <button
+                  type="button"
+                  className={activeDetailsTab === "all" ? "is-active" : ""}
+                  aria-pressed={activeDetailsTab === "all"}
+                  onClick={() => setActiveDetailsTab("all")}
+                >
+                  View all ({props.cluster?.count ?? props.availableListings.length})
+                </button>
+              ) : null}
               <button
                 type="button"
                 className={activeDetailsTab === "history" ? "is-active" : ""}

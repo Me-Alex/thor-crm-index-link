@@ -42,9 +42,39 @@ describe("App", () => {
     expect(within(drawer).queryByText(/Text scurt pentru index/i)).not.toBeInTheDocument();
   });
 
-  it("uses the styled listing dropdown instead of the native select menu", async () => {
+  it("does not duplicate listing navigation when the central listings list is visible", async () => {
     render(<App />);
     await openRadarPage("Anunturi");
+
+    const drawer = await screen.findByTestId("selected-listing-drawer");
+
+    expect(within(drawer).queryByRole("button", { name: /Selecteaza anunt/i })).not.toBeInTheDocument();
+    expect(within(drawer).queryByRole("button", { name: /View all/i })).not.toBeInTheDocument();
+  });
+
+  it("adds contextual listing work tabs above the central listings list", async () => {
+    render(<App />);
+    await openRadarPage("Anunturi");
+
+    const workTabs = await screen.findByTestId("listing-work-tabs");
+    const opportunities = screen.getByTestId("hot-opportunities");
+
+    expect(within(workTabs).getByRole("button", { name: /Toate/i })).toBeInTheDocument();
+    expect(within(workTabs).getByRole("button", { name: /Workflow deschis/i })).toBeInTheDocument();
+    expect(within(workTabs).getByRole("button", { name: /Dedup review/i })).toBeInTheDocument();
+
+    fireEvent.click(within(workTabs).getByRole("button", { name: /Workflow deschis/i }));
+    expect(within(opportunities).getByRole("button", { name: "Apartament 2 camere Titan" })).toBeInTheDocument();
+    expect(within(opportunities).queryByRole("button", { name: "Studio premium Herastrau" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(workTabs).getByRole("button", { name: /Dedup review/i }));
+    expect(within(opportunities).getByRole("button", { name: "Studio premium Herastrau" })).toBeInTheDocument();
+    expect(within(opportunities).queryByRole("button", { name: "Apartament 2 camere Titan" })).not.toBeInTheDocument();
+  });
+
+  it("keeps the styled listing dropdown on the dedup page where no central list is visible", async () => {
+    render(<App />);
+    await openRadarPage("Dedup");
 
     const drawer = await screen.findByTestId("selected-listing-drawer");
     const switcher = drawer.querySelector(".drawer-listing-switcher");
@@ -106,6 +136,59 @@ describe("App", () => {
     expect(monitorButton).not.toHaveAttribute("aria-current", "page");
   });
 
+  it("surfaces an operator command center with contextual navigation", async () => {
+    render(<App />);
+
+    const commandCenter = await screen.findByTestId("operator-command-center");
+    expect(within(commandCenter).getByText("Command center")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("Surse de verificat")).toBeInTheDocument();
+    expect(within(commandCenter).getByText("Dedup de revizuit")).toBeInTheDocument();
+
+    fireEvent.click(within(commandCenter).getByRole("button", { name: "Deschide surse" }));
+    expect(await screen.findByTestId("source-health-page")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Surse" })).toHaveAttribute("aria-current", "page");
+  });
+
+  it("organizes source health into operational tabs", async () => {
+    render(<App />);
+    await openRadarPage("Surse");
+
+    const sourceHealthPage = await screen.findByTestId("source-health-page");
+
+    expect(within(sourceHealthPage).getByRole("button", { name: /Overview/i })).toBeInTheDocument();
+    expect(within(sourceHealthPage).getByRole("button", { name: /Issues/i })).toBeInTheDocument();
+    expect(within(sourceHealthPage).getByRole("button", { name: /Toate sursele/i })).toBeInTheDocument();
+
+    fireEvent.click(within(sourceHealthPage).getByRole("button", { name: /Issues/i }));
+    expect(within(sourceHealthPage).getByText(/Revizuieste olx\.ro/i)).toBeInTheDocument();
+    expect(within(sourceHealthPage).getByTestId("source-runbook-panel")).toHaveTextContent("Runbook sursa");
+
+    fireEvent.click(within(sourceHealthPage).getByRole("button", { name: /Toate sursele/i }));
+    expect(within(sourceHealthPage).getByText("imobiliare.ro")).toBeInTheDocument();
+  });
+
+  it("shows a dedup audit cockpit with conservative merge guidance", async () => {
+    render(<App />);
+    await openRadarPage("Dedup");
+
+    const auditCockpit = await screen.findByTestId("dedup-audit-cockpit");
+
+    expect(within(auditCockpit).getByText("Dedup audit cockpit")).toBeInTheDocument();
+    expect(within(auditCockpit).getByText("Recomandare")).toBeInTheDocument();
+    expect(within(auditCockpit).getByText(/Pastreaza false negatives/i)).toBeInTheDocument();
+  });
+
+  it("adds alert operations for retry and delivery health", async () => {
+    render(<App />);
+    await openRadarPage("Alerte");
+
+    const alertOpsPanel = await screen.findByTestId("alert-ops-panel");
+
+    expect(within(alertOpsPanel).getByText("Alert operations")).toBeInTheDocument();
+    expect(within(alertOpsPanel).getByText("Retry queue")).toBeInTheDocument();
+    expect(within(alertOpsPanel).getByText("Saved search coverage")).toBeInTheDocument();
+  });
+
   it("makes map mode and drawer action buttons change visible state", async () => {
     render(<App />);
 
@@ -113,7 +196,7 @@ describe("App", () => {
     expect(screen.getByRole("button", { name: /Surse active/i })).toBeInTheDocument();
     expect(screen.getByText(/Acoperire surse/i)).toBeInTheDocument();
 
-    await openRadarPage("Anunturi");
+    await openRadarPage("Dedup");
     const drawer = screen.getByTestId("selected-listing-drawer");
     fireEvent.click(within(drawer).getByRole("button", { name: /Istoric/i }));
     expect(within(drawer).getByText(/Istoric pret/i)).toBeInTheDocument();
