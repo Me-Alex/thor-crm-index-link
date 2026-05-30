@@ -1,0 +1,362 @@
+/* Visual polish layer for Thor CRM. Imported after the base radar styles so it can refine spacing,
+   hierarchy and responsiveness without touching application logic. */
+
+.radar-shell {
+  isolation: isolate;
+  grid-template-columns: clamp(14.75rem, 16vw, 17.5rem) minmax(0, 1fr);
+  background:
+    radial-gradient(circle at 12% 12%, rgba(48, 215, 255, 0.16), transparent 18rem),
+    radial-gradient(circle at 82% 8%, rgba(124, 92, 255, 0.18), transparent 26rem),
+    radial-gradient(circle at 72% 78%, rgba(49, 217, 147, 0.08), transparent 22rem),
+    linear-gradient(135deg, #030816 0%, #071425 42%, #020713 100%);
+}
+
+.radar-workspace {
+  display: grid;
+  align-content: start;
+  gap: clamp(0.85rem, 1.2vw, 1.15rem);
+  max-width: 100%;
+  padding: clamp(0.75rem, 1.35vw, 1.25rem);
+}
+
+.radar-page-header {
+  position: sticky;
+  top: 0;
+  z-index: 75;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  border: 1px solid rgba(120, 156, 205, 0.14);
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(8, 21, 40, 0.9), rgba(4, 12, 25, 0.78)),
+    radial-gradient(circle at 7% 0%, rgba(48, 215, 255, 0.14), transparent 16rem);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.055);
+  padding: clamp(0.85rem, 1.4vw, 1.2rem);
+  backdrop-filter: blur(18px);
+}
+
+.radar-page-header h1 {
+  margin: 0.2rem 0 0;
+  font-size: clamp(1.4rem, 2.5vw, 2.35rem);
+  line-height: 0.96;
+}
+
+.radar-page-header p {
+  max-width: 54rem;
+  margin-top: 0.42rem;
+  color: #9fb2cf;
+}
+
+.radar-header-stack {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.65rem;
+  min-width: min(27rem, 100%);
+}
+
+.radar-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
+}
+
+.radar-page-actions span,
+.account-menu-trigger,
+.radar-status-badge,
+.radar-ghost-button {
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+.radar-command-bar {
+  position: sticky;
+  top: clamp(5.7rem, 8.2vw, 7.7rem);
+  z-index: 65;
+  border-radius: 1rem;
+  background:
+    linear-gradient(180deg, rgba(10, 24, 45, 0.94), rgba(4, 13, 27, 0.9)),
+    radial-gradient(circle at 18% 0%, rgba(48, 215, 255, 0.13), transparent 14rem);
+  backdrop-filter: blur(18px);
+}
+
+.radar-command-filters {
+  grid-template-columns:
+    minmax(8rem, 0.9fr)
+    minmax(8.2rem, 0.9fr)
+    minmax(8.6rem, 0.9fr)
+    minmax(10rem, 1.05fr)
+    minmax(14rem, 1.6fr)
+    auto;
+}
+
+.radar-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.58fr) minmax(23rem, 0.92fr);
+  gap: clamp(0.85rem, 1.2vw, 1.15rem);
+  align-items: start;
+}
+
+.radar-primary-column,
+.radar-secondary-column,
+.radar-page-stack,
+.radar-operations-column {
+  display: grid;
+  gap: clamp(0.85rem, 1.1vw, 1.05rem);
+  min-width: 0;
+}
+
+.radar-secondary-column,
+.selected-listing-drawer {
+  position: sticky;
+  top: clamp(10rem, 13vw, 12.4rem);
+}
+
+.market-map-panel,
+.hot-opportunities-panel,
+.activity-timeline-panel,
+.selected-listing-drawer,
+.commercial-panel,
+.operations-panel,
+.radar-kpi-card,
+.listing-work-tabs,
+.listing-work-summary article {
+  border-radius: clamp(0.9rem, 1.2vw, 1.18rem);
+  box-shadow:
+    0 22px 70px rgba(0, 0, 0, 0.33),
+    inset 0 1px 0 rgba(255, 255, 255, 0.055);
+}
+
+.market-map-panel,
+.hot-opportunities-panel,
+.activity-timeline-panel,
+.selected-listing-drawer,
+.commercial-panel,
+.operations-panel {
+  overflow: hidden;
+}
+
+.market-map-panel {
+  min-height: min(64vh, 44rem);
+}
+
+.radar-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(19rem, 0.78fr) minmax(0, 1.22fr);
+  gap: clamp(0.85rem, 1.2vw, 1.15rem);
+  align-items: start;
+}
+
+.radar-detail-grid.is-dedup-page {
+  grid-template-columns: minmax(19rem, 0.86fr) minmax(0, 1.14fr);
+}
+
+.listing-work-tabs {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  border: 1px solid rgba(120, 156, 205, 0.14);
+  background: rgba(3, 11, 24, 0.58);
+  padding: 0.42rem;
+}
+
+.listing-work-tabs button {
+  min-width: 0;
+  border-radius: 0.8rem;
+  transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+}
+
+.listing-work-tabs button:hover,
+.listing-work-tabs button.is-active {
+  transform: translateY(-1px);
+}
+
+.listing-work-summary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+
+.listing-work-summary article {
+  border: 1px solid rgba(120, 156, 205, 0.14);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(48, 215, 255, 0.1), transparent 8rem),
+    rgba(5, 15, 29, 0.76);
+  padding: 0.82rem;
+}
+
+.alerts-dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) repeat(2, minmax(17rem, 0.9fr));
+  gap: clamp(0.85rem, 1.2vw, 1.15rem);
+  align-items: start;
+}
+
+.radar-commercial-section {
+  max-width: 118rem;
+}
+
+.radar-sidebar {
+  z-index: 90;
+  padding-inline: clamp(0.7rem, 1vw, 0.95rem);
+}
+
+.radar-nav-item,
+.account-menu-trigger,
+.radar-ghost-button,
+.radar-select-button,
+.radar-select-option,
+.workflow-status-buttons button,
+.compact-form button,
+.commercial-form button,
+.billing-plan-grid button {
+  transition:
+    transform 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    background 160ms ease,
+    color 160ms ease;
+}
+
+.radar-nav-item:hover,
+.account-menu-trigger:hover,
+.radar-ghost-button:hover,
+.radar-select-button:hover,
+.workflow-status-buttons button:hover,
+.compact-form button:hover,
+.commercial-form button:hover,
+.billing-plan-grid button:hover {
+  transform: translateY(-1px);
+}
+
+.radar-select-menu,
+.account-access-popover {
+  backdrop-filter: blur(20px);
+}
+
+@media (min-width: 1480px) {
+  .radar-workspace {
+    padding-right: clamp(1.25rem, 2vw, 2rem);
+  }
+
+  .radar-grid {
+    grid-template-columns: minmax(0, 1.7fr) minmax(25rem, 0.85fr);
+  }
+}
+
+@media (max-width: 1240px) {
+  .radar-shell {
+    grid-template-columns: 1fr;
+  }
+
+  .radar-sidebar {
+    position: sticky;
+    top: 0;
+    z-index: 120;
+    grid-template-rows: auto;
+    height: auto;
+    min-height: 0;
+    overflow: visible;
+    border-width: 0 0 1px;
+  }
+
+  .radar-sidebar::after,
+  .radar-compliance-card {
+    display: none;
+  }
+
+  .radar-nav {
+    display: flex;
+    gap: 0.45rem;
+    overflow-x: auto;
+    padding-bottom: 0.1rem;
+    scrollbar-width: thin;
+  }
+
+  .radar-nav-item {
+    min-width: 11rem;
+  }
+
+  .radar-workspace {
+    padding-top: 0.85rem;
+  }
+
+  .radar-page-header,
+  .radar-command-bar {
+    position: relative;
+    top: auto;
+  }
+
+  .radar-grid,
+  .radar-detail-grid,
+  .radar-detail-grid.is-dedup-page,
+  .alerts-dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .radar-secondary-column,
+  .selected-listing-drawer {
+    position: static;
+  }
+}
+
+@media (max-width: 920px) {
+  .radar-page-header,
+  .radar-header-stack,
+  .radar-command-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .radar-header-stack,
+  .radar-page-actions {
+    justify-content: stretch;
+    min-width: 0;
+  }
+
+  .radar-page-actions span,
+  .account-menu-trigger {
+    width: 100%;
+  }
+
+  .radar-command-filters,
+  .radar-command-actions,
+  .listing-work-tabs,
+  .listing-work-summary {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .radar-command-actions {
+    align-items: stretch;
+  }
+
+  .radar-status-badge {
+    max-width: none;
+  }
+
+  .market-map-panel {
+    min-height: 28rem;
+  }
+}
+
+@media (max-width: 640px) {
+  .radar-workspace {
+    padding-inline: 0.55rem;
+  }
+
+  .radar-page-header h1 {
+    font-size: 1.45rem;
+  }
+
+  .radar-command-filters,
+  .radar-command-actions,
+  .listing-work-tabs,
+  .listing-work-summary {
+    grid-template-columns: 1fr;
+  }
+
+  .radar-nav-item {
+    min-width: 9.8rem;
+  }
+}
